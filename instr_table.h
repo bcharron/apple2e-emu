@@ -1,5 +1,5 @@
 /*
- * emu.c - An Apple ][e Emulator
+ * instr_table.h - <description>
  * Copyright (C) 2011 Benjamin Charron <bcharron@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -16,34 +16,20 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * emu.c - Benjamin Charron <bcharron@pobox.com>
- * Created  : Fri Sep  9 16:47:51 2011
+ * instr_table.h - Benjamin Charron <bcharron@pobox.com>
+ * Created  : Mon Sep 12 23:51:43 2011
  * Revision : $Id$
  */
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-
-#define ROM_FILE "APPLE2E.ROM"
-
-struct cpu_state_s {
-	uint8_t a;
-	uint8_t x;
-	uint8_t y;
-	uint8_t sp;   // Stack pointer. Works in 0x0100 to 0x01FF (page 1)
-	uint8_t psw;
-	uint16_t pc;
-};
-
-typedef struct cpu_state_s cpu_state_t;
-
 struct instruction_s {
-	char *str;
+	const char *str;
 	unsigned int len;      // Number of bytes in instruction
 	unsigned int cycles;   // Number of cycles for this operation
 };
 
+typedef struct instruction_s instruction_t;
+
+#define INSTR_TABLE_LEN sizeof(instr_table) / sizeof(instruction_t)
 
 struct instruction_s instr_table[] =
 {
@@ -304,130 +290,3 @@ struct instruction_s instr_table[] =
 	{ "INC $%02X%02X,X",   3, 7 }, // 0xFE
 	{ "BBS7 $%02X",        2, 2 }, // 0xFF
 };
-
-char *instr_c01[] =
-{
-	"ORA", // 0x00
-	"AND", // 0x01
-	"EOR", // 0x02
-	"ADC", // 0x03
-	"STA", // 0x04
-	"LDA", // 0x05
-	"CMP", // 0x06
-	"SBC", // 0x07
-};
-
-char *addr_mode_c01[] =
-{
-	"($%02X,X)",  // 0x00
-	"$%02X",      // 0x01
-	"#$%02X",     // 0x02
-	"#$%02X%02X", // 0x03
-	"($%02X,Y)",  // 0x04
-	"$%02X,X",    // 0x05
-	"$%02X%02X,Y", // 0x06
-	"$%02X%02X,X", // 0x06
-};
-
-typedef struct instruction_s instruction_t;
-
-#define INSTR_TABLE_LEN sizeof(instr_table) / sizeof(instruction_t)
-
-int dump_instruction(char *strbuf, int bufsize, uint16_t pc, uint8_t *ram)
-{
-	unsigned int len = 0;
-
-	uint8_t opcode = ram[pc];
-
-	if (opcode >= INSTR_TABLE_LEN) {
-		fprintf(stderr, "Error: Opcode 0x%02X is outside the instruction table\n", opcode);
-		return(-1);
-	}
-
-	instruction_t *instr = &instr_table[opcode];
-
-	len = instr->len;
-
-	switch(len) {
-		case 1:
-		{
-			snprintf(strbuf, bufsize, "%s", instr->str);
-			break;
-		}
-
-		case 2:
-		{
-			uint8_t operand1 = ram[pc + 1];
-			snprintf(strbuf, bufsize, instr->str, operand1);
-			break;
-		}
-
-		case 3:
-		{
-			uint8_t operand1 = ram[pc + 1];
-			uint8_t operand2 = ram[pc + 2];
-			snprintf(strbuf, bufsize, instr->str, operand2, operand1);
-			break;
-		}
-
-		default:
-		{
-			fprintf(stderr, "ERROR: Opcode (%02X) has len %u (should be between 1 and 3)\n", opcode, len);
-			snprintf(strbuf, bufsize, "OOPS[%02X]\n", opcode);
-			break;
-		}
-	}
-
-	return(len);
-}
-
-void usage(char *argv0)
-{
-	printf("Usage: %s <file.dsk>\n", argv0);
-}
-
-int main (int argc, char *argv[])
-{
-	char strbuf[1024];
-	uint8_t ram[64 * 1024];
-	int pc;
-	int len;
-	int x;
-	int instr_size;
-	uint8_t opcode;
-	instruction_t *instr;
-	FILE *f;
-
-	f = fopen(ROM_FILE, "r");
-	if (! f) {
-		perror("fopen()");
-		exit(1);
-	}
-	
-	len = fread(ram, 1, sizeof(ram), f);
-	
-	printf("Read %d bytes of ROM\n", len);
-
-	pc = 0;
-	do {
-		opcode = ram[pc];
-		instr = &instr_table[opcode];
-
-		instr_size = dump_instruction(strbuf, sizeof(strbuf), pc, ram);
-
-		printf("%04X  ", pc);
-
-		for (x = 0; x < 4; x++) {
-			if (x < instr->len)
-				printf("%02X ", ram[pc + x]);
-			else
-				printf("   ");
-		}
-
-		printf("%s\n", strbuf);
-
-		pc += instr_size;
-	} while (pc < len && instr_size > 0);
-
-	return (0);
-}

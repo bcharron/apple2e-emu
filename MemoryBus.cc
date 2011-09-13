@@ -1,11 +1,28 @@
 #include <vector>
+#include <string.h>
 #include "MemoryBus.h"
+
+#define BOGUS_DEFAULT_VALUE 0xA5
 
 MemoryBus::MemoryBus(uint16_t size)
 {
-	uint8_t mem = new uint8_t[size];
+	this->memorySize = size;
+	uint8_t *mem = new uint8_t[size];
+
+	memset(mem, BOGUS_DEFAULT_VALUE, size);
 	ram = new MemoryRegion(0, size - 1, mem);
 	delete[] mem;
+}
+
+unsigned int
+MemoryBus::getSize(void)
+{
+	return(this->memorySize);
+}
+
+void MemoryBus::addRegion(MemoryRegion *region)
+{
+	regions.push_back(region);
 }
 
 MemoryRegion* MemoryBus::findRegion(uint16_t offset)
@@ -26,16 +43,12 @@ MemoryRegion* MemoryBus::findRegion(uint16_t offset)
 
 uint8_t MemoryBus::read(uint16_t offset)
 {
-	MemoryRegion *region;
-
-	region = this->findRegion(offset);
-
-	uint8_t val;
+	MemoryRegion* region = this->findRegion(offset);
 
 	if (! region)
 		region = ram;
 
-	val = region->read(offset);
+	uint8_t val = region->read(offset);
 
 	return(val);
 }
@@ -43,9 +56,7 @@ uint8_t MemoryBus::read(uint16_t offset)
 
 void MemoryBus::write(uint16_t offset, uint8_t byte)
 {
-	MemoryRegion *region;
-
-	region = this->findRegion(offset);
+	MemoryRegion* region = this->findRegion(offset);
 
 	if (! region)
 		region = ram;

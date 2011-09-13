@@ -3,13 +3,17 @@ CC=g++
 
 all: emu
 
-emu: MemoryRegion.o MemoryBus.o emu.o
+emu: Machine.o MemoryRegion.o MemoryBus.o MemoryScreen.o emu.o
 
-emu.o: emu.c
+emu.o: emu.cc
 
-MemoryBus.o: MemoryBus.cc
+Machine.o: Machine.cc Machine.h
 
-MemoryRegion.o: MemoryRegion.cc
+MemoryBus.o: MemoryBus.cc MemoryBus.h
+
+MemoryRegion.o: MemoryRegion.cc MemoryBus.h
+
+MemoryScreen.o: MemoryScreen.cc MemoryScreen.h
 
 clean:
 	rm -f *.o emu
