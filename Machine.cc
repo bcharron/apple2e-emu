@@ -334,7 +334,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x19:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_ora(val);
 			break;
@@ -360,7 +360,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x1D:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_ora(val);
 			break;
@@ -368,7 +368,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x1E:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			do_asl_m(offset);
 			break;
 		}
@@ -544,7 +544,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x39:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_and(val);
 			break;
@@ -558,29 +558,29 @@ Machine::executeNextInstruction(void)
 
 		case 0x3B:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
-			uint8_t val = memory->read(offset);
-			do_bit(val);
 			break;
 		}
 
 		case 0x3C:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
-			do_and(val);
+			do_bit(val);
 			break;
 		}
 
 		case 0x3D:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
-			do_rol_m(offset);
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
+			uint8_t val = memory->read(offset);
+			do_and(val);
 			break;
 		}
 
 		case 0x3E:
 		{
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
+			do_rol_m(offset);
 			break;
 		}
 
@@ -750,7 +750,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x59:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_eor(val);
 			break;
@@ -774,7 +774,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x5D:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_eor(val);
 			break;
@@ -782,7 +782,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x5E:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			do_lsr_m(offset);
 			break;
 		}
@@ -960,7 +960,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x79:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_adc(val);
 			break;
@@ -979,7 +979,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x7C:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t low = memory->read(offset);
 			uint8_t high = memory->read(offset + 1);
 			offset = make16(high, low);
@@ -989,7 +989,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x7D:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_adc(val);
 			break;
@@ -997,7 +997,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x7E:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			do_ror_m(offset);
 			break;
 		}
@@ -1168,7 +1168,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x99:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			do_sta(offset);
 			break;
 		}
@@ -1193,14 +1193,14 @@ Machine::executeNextInstruction(void)
 
 		case 0x9D:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			do_sta(offset);
 			break;
 		}
 
 		case 0x9E:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			do_stz(offset);
 			break;
 		}
@@ -1384,7 +1384,7 @@ Machine::executeNextInstruction(void)
 
 		case 0xB9:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_lda(val);
 			break;
@@ -1403,7 +1403,7 @@ Machine::executeNextInstruction(void)
 
 		case 0xBC:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_ldy(val);
 			break;
@@ -1411,7 +1411,7 @@ Machine::executeNextInstruction(void)
 
 		case 0xBD:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.x;
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_lda(val);
 			break;
@@ -1419,7 +1419,7 @@ Machine::executeNextInstruction(void)
 
 		case 0xBE:
 		{
-			uint16_t offset = make16(operands[1], operands[0]) + registers.y;
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
 			uint8_t val = memory->read(offset);
 			do_ldx(val);
 			break;
@@ -1440,6 +1440,9 @@ Machine::executeNextInstruction(void)
 
 		case 0xC1:
 		{
+			uint16_t offset = get_indexed_indirect(operands[0]);
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
@@ -1455,16 +1458,24 @@ Machine::executeNextInstruction(void)
 
 		case 0xC4:
 		{
+			uint16_t offset = operands[0];
+			uint8_t val = memory->read(offset);
+			do_cpy(val);
 			break;
 		}
 
 		case 0xC5:
 		{
+			uint16_t offset = operands[0];
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
 		case 0xC6:
 		{
+			uint16_t offset = operands[0];
+			do_dec(offset);
 			break;
 		}
 
@@ -1475,16 +1486,19 @@ Machine::executeNextInstruction(void)
 
 		case 0xC8:
 		{
+			do_iny();
 			break;
 		}
 
 		case 0xC9:
 		{
+			do_cmp(operands[0]);
 			break;
 		}
 
 		case 0xCA:
 		{
+			do_dex();
 			break;
 		}
 
@@ -1495,16 +1509,24 @@ Machine::executeNextInstruction(void)
 
 		case 0xCC:
 		{
+			uint16_t offset = make16(operands[1], operands[0]);
+			uint8_t val = memory->read(offset);
+			do_cpy(val);
 			break;
 		}
 
 		case 0xCD:
 		{
+			uint16_t offset = make16(operands[1], operands[0]);
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
 		case 0xCE:
 		{
+			uint16_t offset = make16(operands[1], operands[0]);
+			do_dec(offset);
 			break;
 		}
 
@@ -1517,16 +1539,23 @@ Machine::executeNextInstruction(void)
 
 		case 0xD0:
 		{
+			do_bne(operands[0]);
 			break;
 		}
 
 		case 0xD1:
 		{
+			uint16_t offset = get_indirect_indexed(operands[0]);
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
 		case 0xD2:
 		{
+			uint16_t offset = get_indirect_zeropage(operands[0]);
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
@@ -1542,11 +1571,16 @@ Machine::executeNextInstruction(void)
 
 		case 0xD5:
 		{
+			uint16_t offset = operands[0];
+			uint8_t val = memory->read(offset);
+			do_cmp(val);			
 			break;
 		}
 
 		case 0xD6:
 		{
+			uint16_t offset = (operands[0] + registers.x) % 0xff;
+			do_dec(offset);
 			break;
 		}
 
@@ -1557,16 +1591,21 @@ Machine::executeNextInstruction(void)
 
 		case 0xD8:
 		{
+			do_cld();
 			break;
 		}
 
 		case 0xD9:
 		{
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
 		case 0xDA:
 		{
+			do_phx();
 			break;
 		}
 
@@ -1582,11 +1621,16 @@ Machine::executeNextInstruction(void)
 
 		case 0xDD:
 		{
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
 		case 0xDE:
 		{
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
+			do_dec(offset);
 			break;
 		}
 
@@ -1599,11 +1643,15 @@ Machine::executeNextInstruction(void)
 
 		case 0xE0:
 		{
+			do_cpx(operands[0]);
 			break;
 		}
 
 		case 0xE1:
 		{
+			uint16_t offset = get_indexed_indirect(operands[0]);
+			uint8_t val = memory->read(offset);
+			do_sbc(val);
 			break;
 		}
 
@@ -1619,16 +1667,24 @@ Machine::executeNextInstruction(void)
 
 		case 0xE4:
 		{
+			uint16_t offset = operands[0];
+			uint8_t val = memory->read(offset);
+			do_cmp(val);
 			break;
 		}
 
 		case 0xE5:
 		{
+			uint16_t offset = operands[0];
+			uint8_t val = memory->read(offset);
+			do_sbc(val);
 			break;
 		}
 
 		case 0xE6:
 		{
+			uint16_t offset = operands[0];
+			do_inc(offset);
 			break;
 		}
 
@@ -1639,16 +1695,19 @@ Machine::executeNextInstruction(void)
 
 		case 0xE8:
 		{
+			do_inx();
 			break;
 		}
 
 		case 0xE9:
 		{
+			do_sbc(operands[0]);
 			break;
 		}
 
 		case 0xEA:
 		{
+			do_nop();
 			break;
 		}
 
@@ -1659,16 +1718,24 @@ Machine::executeNextInstruction(void)
 
 		case 0xEC:
 		{
+			uint16_t offset = make16(operands[1], operands[0]);
+			uint8_t val = memory->read(offset);
+			do_cpx(val);
 			break;
 		}
 
 		case 0xED:
 		{
+			uint16_t offset = make16(operands[1], operands[0]);
+			uint8_t val = memory->read(offset);
+			do_sbc(val);
 			break;
 		}
 
 		case 0xEE:
 		{
+			uint16_t offset = make16(operands[1], operands[0]);
+			do_inc(offset);
 			break;
 		}
 
@@ -1681,16 +1748,23 @@ Machine::executeNextInstruction(void)
 
 		case 0xF0:
 		{
+			do_beq(operands[0]);
 			break;
 		}
 
 		case 0xF1:
 		{
+			uint16_t offset = get_indirect_indexed(operands[0]);
+			uint8_t val = memory->read(offset);
+			do_sbc(val);
 			break;
 		}
 
 		case 0xF2:
 		{
+			uint16_t offset = get_indirect_zeropage(operands[0]);
+			uint8_t val = memory->read(offset);
+			do_sbc(val);
 			break;
 		}
 
@@ -1706,11 +1780,16 @@ Machine::executeNextInstruction(void)
 
 		case 0xF5:
 		{
+			uint16_t offset = (operands[0] + registers.x) % 0xff;
+			uint8_t val = memory->read(offset);
+			do_sbc(val);
 			break;
 		}
 
 		case 0xF6:
 		{
+			uint16_t offset = (operands[0] + registers.x) % 0xff;
+			do_inc(offset);
 			break;
 		}
 
@@ -1721,16 +1800,21 @@ Machine::executeNextInstruction(void)
 
 		case 0xF8:
 		{
+			do_sed();
 			break;
 		}
 
 		case 0xF9:
 		{
+			uint16_t offset = get_absolute_y(operands[0], operands[1]);
+			uint8_t val = memory->read(offset);
+			do_sbc(val);
 			break;
 		}
 
 		case 0xFA:
 		{
+			do_plx();
 			break;
 		}
 
@@ -1746,11 +1830,16 @@ Machine::executeNextInstruction(void)
 
 		case 0xFD:
 		{
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
+			uint8_t val = memory->read(offset);
+			do_sbc(val);			
 			break;
 		}
 
 		case 0xFE:
 		{
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
+			do_inc(offset);
 			break;
 		}
 
@@ -1769,6 +1858,24 @@ Machine::executeNextInstruction(void)
 	}
 
 	this->cycles += instr->cycles;
+}
+
+uint16_t
+Machine::get_absolute_x(uint8_t operand0, uint8_t operand1)
+{
+	// How is wrapping handled?
+	uint16_t offset = make16(operand1, operand0) + registers.x;
+
+	return(offset);
+}
+
+uint16_t
+Machine::get_absolute_y(uint8_t operand0, uint8_t operand1)
+{
+	// How is wrapping handled?
+	uint16_t offset = make16(operand1, operand0) + registers.y;
+
+	return(offset);
 }
 
 /* Returns the effective memory address of (zp_offset,X) */
@@ -1882,6 +1989,13 @@ Machine::do_bcs(int8_t rel)
 }
 
 void
+Machine::do_beq(int8_t rel)
+{	
+	if (registers.psw.f.z)
+		registers.pc += rel;
+}
+
+void
 Machine::do_bit(uint8_t val)
 {	
 	val = val & registers.a;
@@ -1899,9 +2013,16 @@ Machine::do_bmi(int8_t rel)
 }
 
 void
+Machine::do_bne(int8_t rel)
+{
+	if (! registers.psw.f.z)
+		registers.pc += rel;
+}
+
+void
 Machine::do_bpl(int8_t rel)
 {	
-	if (registers.psw.f.n == 0)
+	if (! registers.psw.f.n)
 		registers.pc += rel;
 }
 
@@ -1938,6 +2059,12 @@ Machine::do_clc(void)
 }
 
 void
+Machine::do_cld(void)
+{
+	registers.psw.f.d = 0;
+}
+
+void
 Machine::do_cli(void)
 {
 	registers.psw.f.i = 0;
@@ -1950,20 +2077,48 @@ Machine::do_clv(void)
 }
 
 void
+Machine::compare(uint8_t reg, uint8_t val)
+{
+	uint8_t result = reg - val;
+
+	registers.psw.f.c = (reg >= val);
+	registers.psw.f.z = (reg == val);
+	registers.psw.f.n = ((result & 0x80) != 0);
+}
+
+void
+Machine::do_cmp(uint8_t val)
+{
+	compare(registers.a, val);
+}
+
+void
+Machine::do_cpx(uint8_t val)
+{
+	compare(registers.x, val);
+}
+
+void
 Machine::do_cpy(uint8_t val)
 {
-	uint8_t result = registers.y - val;
-
-	registers.psw.f.c = (registers.y >= val);
-	registers.psw.f.z = (registers.y == val);
-	
-	registers.psw.f.n = ((result & 0x80) != 0);
+	compare(registers.y, val);
 }
 
 void
 Machine::do_dea(void)
 {
 	registers.a--;
+}
+
+void
+Machine::do_dec(uint16_t offset)
+{
+	uint8_t val = memory->read(offset);
+	val--;
+	memory->write(offset, val);
+
+	registers.psw.f.z = (val == 0);
+	registers.psw.f.n = ((val & 0x80) != 0);
 }
 
 void
@@ -1991,6 +2146,36 @@ void
 Machine::do_ina(void)
 {
 	registers.a++;
+
+	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
+}
+
+void
+Machine::do_inx(void)
+{
+	registers.x++;
+	registers.psw.f.z = (registers.x == 0);
+	registers.psw.f.n = ((registers.x & 0x80) != 0);
+}
+
+void
+Machine::do_iny(void)
+{
+	registers.y++;
+	registers.psw.f.z = (registers.y == 0);
+	registers.psw.f.n = ((registers.y & 0x80) != 0);
+}
+
+void
+Machine::do_inc(uint16_t offset)
+{
+	uint8_t val = memory->read(offset);
+	val++;
+	memory->write(offset, val);
+
+	registers.psw.f.z = (val == 0);
+	registers.psw.f.n = ((val & 0x80) != 0);	
 }
 
 void
@@ -2215,9 +2400,26 @@ Machine::do_rts(void)
 }
 
 void
+Machine::do_sbc(uint8_t val)
+{
+	int temp = registers.a - val - (1 - registers.psw.f.c);
+	registers.a = registers.a - val - (1 - registers.psw.f.c);
+
+	registers.psw.f.c = ! ((registers.a & 0x80) != 0);
+	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.v = (temp > 127 || temp < -128);
+}
+
+void
 Machine::do_sec(void)
 {
 	registers.psw.f.c = 1;
+}
+
+void
+Machine::do_sed(void)
+{
+	registers.psw.f.d = 1;
 }
 
 void
@@ -2321,7 +2523,7 @@ Machine::pop_stack(void)
 void
 Machine::push_stack(uint8_t val)
 {
-	uint16_t offset = registers.sp;
+	uint16_t offset = OFFSET_PAGE_1 + registers.sp;
 
 	memory->write(offset, val);
 
