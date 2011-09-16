@@ -118,9 +118,9 @@ Machine::dumpInstruction(uint16_t offset)
 }
 
 /* Make a 16-bit value out of two 8-bit ones */
-uint16_t make16(uint8_t low, uint8_t high)
+uint16_t make16(uint8_t high, uint8_t low)
 {
-	uint16_t offset = ((uint16_t) high << 8) + low;
+	uint16_t offset = ((uint16_t) high << 8) | low;
 
 	return(offset);
 }
@@ -246,6 +246,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x0C:
 		{	
+			// Shouldn't the operands be reversed?
 			uint16_t offset = make16(operands[1], operands[0]);
 			do_tsb(offset);
 			break;
@@ -870,7 +871,14 @@ Machine::executeNextInstruction(void)
 
 		case 0x6C:
 		{
+			// XXX: NMOS versions have a bug where, if
+			// offset = xxFF, than xxFF and xx00 are
+			// fetched instead of xxFF and x100
 			uint16_t offset = make16(operands[1], operands[0]);
+			uint8_t low = memory->read(offset);
+			uint8_t high = memory->read(offset + 1);
+
+			offset = make16(high, low);
 			do_jmp(offset);
 			break;
 		}
@@ -979,6 +987,9 @@ Machine::executeNextInstruction(void)
 
 		case 0x7C:
 		{
+			// XXX: NMOS versions have a bug where, if
+			// offset = xxFF, than xxFF and xx00 are
+			// fetched instead of xxFF and x100
 			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t low = memory->read(offset);
 			uint8_t high = memory->read(offset + 1);
@@ -2035,7 +2046,27 @@ Machine::do_bra(int8_t rel)
 void
 Machine::do_brk(void)
 {
-	cout << "do_brk() not implemented yet" << endl;
+	// Yes, the byte following a BRK is skipped. Apparently this
+	// is normal.
+	registers.pc++;
+
+	uint8_t low = get_low(registers.pc);
+	uint8_t high = get_high(registers.pc);
+	
+	push_stack(low);
+	push_stack(high);
+
+	// BRK flag is only set on the stack.
+	spc_flags_t flags;
+	flags.val = registers.psw.val;
+	flags.f.b = 1;
+
+	push_stack(flags.val);
+
+	low = memory->read(0xFFFE);
+	high = memory->read(0xFFFF);
+
+	registers.pc = make16(high, low);
 }
 
 void
@@ -2387,7 +2418,7 @@ Machine::do_rti(void)
 	uint8_t low = pop_stack();
 	uint8_t high = pop_stack();
 	
-	registers.pc = make16(low, high);
+	registers.pc = make16(high, low);
 }
 
 void
@@ -2396,7 +2427,7 @@ Machine::do_rts(void)
 	uint8_t low = pop_stack();
 	uint8_t high = pop_stack();
 	
-	registers.pc = make16(low, high);
+	registers.pc = make16(high, low);
 }
 
 void
