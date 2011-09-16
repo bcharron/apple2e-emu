@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <assert.h>
+#include <iomanip>
 #include "Machine.h"
 #include "instr_table.h"
 
@@ -51,6 +52,50 @@ uint16_t
 Machine::getPC(void)
 {
 	return(this->registers.pc);
+}
+
+void
+Machine::dumpFlags(spc_flags_t *flags, char *buf)
+{
+	char strFlags[] = "czidbpvn";
+	int x;
+
+	for (x = 0; x < 8; x++) {
+		uint8_t v = 0x01 << x;
+		
+		if (flags->val & v) {
+			buf[x] = strFlags[x];
+		} else {
+			buf[x] = ' ';
+		}
+	}
+
+	buf[x] = '\0';
+}
+
+void
+Machine::dumpRegisters(void)
+{
+	char strFlags[10];
+
+	dumpFlags(&registers.psw, strFlags);
+
+	cout << "[ Registers ]" << endl;
+	printf("A  : 0x%02X (S%d  U%u)\n", registers.a, (int8_t) registers.a, registers.a);
+	printf("X  : 0x%02X (S%d  U%u)\n", registers.x, (int8_t) registers.x, registers.x);
+	printf("Y  : 0x%02X (S%d  U%u)\n", registers.y, (int8_t) registers.y, registers.y);
+	printf("SP : 0x%02X (S%d  U%u)\n", registers.sp, (int8_t) registers.sp, registers.sp);
+	printf("PC : 0x%02X (S%d  U%u)\n", registers.pc, (int8_t) registers.pc, registers.pc);
+	printf("PSW: 0x%02X  [%s]\n", registers.psw.val, strFlags);
+
+/*
+	cout << "A  : 0x" << hex << setw( 2 ) << setfill( '0' ) << registers.a << endl;
+	cout << "X  : 0x" << hex << setw( 2 ) << setfill( '0' ) << registers.x << endl;
+	cout << "Y  : 0x" << hex << setw( 2 ) << setfill( '0' ) << registers.y << endl;
+	cout << "SP : 0x" << hex << setw( 2 ) << setfill( '0' ) << registers.sp << endl;
+	cout << "PC : 0x" << hex << setw( 4 ) << setfill( '0' ) << registers.pc << endl;
+	cout << "PSW: 0x" << hex << setw( 2 ) << setfill( '0' ) << registers.psw.val << endl;
+*/
 }
 
 /* Returns number of bytes fetched for this instruction */
@@ -1239,7 +1284,7 @@ Machine::executeNextInstruction(void)
 
 		case 0xA2:
 		{
-			do_ldy(operands[0]);
+			do_ldx(operands[0]);
 			break;
 		}
 
@@ -1894,8 +1939,13 @@ uint16_t
 Machine::get_indexed_indirect(uint8_t zp_offset)
 {
 	uint16_t offset = (registers.x + zp_offset) % 0xFF;
+
+	uint8_t low = memory->read(offset);
+	uint8_t high = memory->read(offset + 1);
+
+	uint16_t effective_address = make16(high, low);
 	
-	return(offset);
+	return(effective_address);
 }
 
 /* Returns the effective memory address of (zp_offset),Y */
@@ -1913,7 +1963,7 @@ Machine::get_indirect_zeropage(uint8_t zp_offset)
 {
 	uint8_t low = memory->read(zp_offset);
 	uint8_t high = memory->read(zp_offset + 1);
-	uint16_t offset = ((uint16_t) (high << 8)) + low;
+	uint16_t offset = make16(high, low);
 	
 	return(offset);
 }
@@ -2231,18 +2281,21 @@ void
 Machine::do_lda(uint8_t val)
 {
 	registers.a = val;
+	registers.psw.f.z = (registers.a == 0);
 }
 
 void
 Machine::do_ldx(uint8_t val)
 {
 	registers.x = val;
+	registers.psw.f.z = (registers.x == 0);
 }
 
 void
 Machine::do_ldy(uint8_t val)
 {
 	registers.y = val;
+	registers.psw.f.z = (registers.y == 0);
 }
 
 void
@@ -2250,7 +2303,8 @@ Machine::do_ora(uint8_t val)
 {
 	this->registers.a |= val;
 
-	// XXX: flags N and Z are supposed to be set.. but how?
+	registers.psw.f.n = (registers.a & 0x80) >> 7;
+	registers.psw.f.z = (registers.a == 0);
 }
 
 uint8_t
@@ -2542,9 +2596,9 @@ Machine::do_tya(void)
 uint8_t
 Machine::pop_stack(void)
 {
-	registers.sp--;
+	registers.sp++;
 
-	uint16_t offset = registers.sp;
+	uint16_t offset = OFFSET_PAGE_1 | registers.sp;
 
 	uint8_t val = memory->read(offset);
 
@@ -2554,9 +2608,61 @@ Machine::pop_stack(void)
 void
 Machine::push_stack(uint8_t val)
 {
-	uint16_t offset = OFFSET_PAGE_1 + registers.sp;
+	uint16_t offset = OFFSET_PAGE_1 | registers.sp;
 
 	memory->write(offset, val);
 
 	registers.sp--;
+}
+
+bool
+Machine::testCPU(void)
+{
+	uint16_t offset = 0x0000;
+
+	setPC(offset);
+
+	dumpRegisters();
+
+	memory->write(offset++, 0xA9); // LDA #$00
+	memory->write(offset++, 0x00);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x00 && registers.psw.f.z == 1);
+
+	memory->write(offset++, 0xA9); // LDA #$A5
+	memory->write(offset++, 0xA5);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();	
+	dumpRegisters();
+	assert(registers.a == 0xA5 && registers.psw.f.z == 0);
+
+	memory->write(offset++, 0xA2); // LDX #$FF
+	memory->write(offset++, 0xFF);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();	
+	dumpRegisters();
+	assert(registers.x == 0xFF && registers.psw.f.z == 0);
+
+	memory->write(offset++, 0x9A); // TXS
+	dumpInstruction(registers.pc);
+	executeNextInstruction();	
+	dumpRegisters();
+	assert(registers.sp == 0xFF);
+
+	memory->write(offset++, 0x48); // PHA
+	dumpInstruction(registers.pc);
+	executeNextInstruction();	
+	dumpRegisters();
+	uint8_t mem = memory->read(0x01FF);
+	assert(registers.sp == 0xFE && mem == 0xA5);
+
+	memory->write(offset++, 0x68); // PLA
+	dumpInstruction(registers.pc);
+	executeNextInstruction();	
+	dumpRegisters();
+	assert(registers.sp == 0xFF && registers.a == 0xA5);
+
+	return(true);
 }

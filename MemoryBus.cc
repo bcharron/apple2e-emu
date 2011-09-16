@@ -1,16 +1,22 @@
+#include <iostream>
 #include <vector>
 #include <string.h>
 #include "MemoryBus.h"
 
-#define BOGUS_DEFAULT_VALUE 0xA5
+#define BOGUS_DEFAULT_VALUE 0x00
 
-MemoryBus::MemoryBus(uint16_t size)
+using namespace std;
+
+MemoryBus::MemoryBus(unsigned int size)
 {
 	this->memorySize = size;
+
 	uint8_t *mem = new uint8_t[size];
 
 	memset(mem, BOGUS_DEFAULT_VALUE, size);
-	ram = new MemoryRegion(0, size - 1, mem);
+
+	this->ram = new MemoryRegion(0, size - 1, mem);
+
 	delete[] mem;
 }
 
@@ -32,13 +38,14 @@ MemoryRegion* MemoryBus::findRegion(uint16_t offset)
 
 	for(it = regions.begin(); it < regions.end(); it++)
 	{
+		region = *it;
+
 		if (region->getStart() <= offset && region->getEnd() >= offset) {
-			region = *it;
-			break;
+			return(region);
 		}
 	}
 
-	return(region);
+	return(NULL);
 }
 
 uint8_t MemoryBus::read(uint16_t offset)

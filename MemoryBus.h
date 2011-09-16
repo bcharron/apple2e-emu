@@ -8,7 +8,7 @@
 class MemoryBus
 {
 public:
-	MemoryBus(uint16_t size);
+	MemoryBus(unsigned int size);
 	void addRegion(MemoryRegion *region);
 	uint8_t read(uint16_t offset);
 	void write(uint16_t offset, uint8_t byte);

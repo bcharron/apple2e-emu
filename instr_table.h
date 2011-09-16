@@ -48,7 +48,7 @@ struct instruction_s instr_table[] =
 	{ "TSB $%02X%02X",     3, 6 }, // 0x0C
 	{ "ORA $%02X%02X",     3, 4 }, // 0x0D
 	{ "ASL $%02X%02X",     3, 6 }, // 0x0E
-	{ "BBR0 $%02X",        2, 2 }, // 0x0F
+	{ "BBR0 $%02X,$%02X",  3, 2 }, // 0x0F
 	{ "BPL $%02X",         2, 2 }, // 0x10
 	{ "ORA ($%02X),Y",     2, 5 }, // 0x11
 	{ "ORA ($%02X)",       2, 5 }, // 0x12
@@ -64,7 +64,7 @@ struct instruction_s instr_table[] =
 	{ "TRB $%02X%02X",     3, 6 }, // 0x1C
 	{ "ORA $%02X%02X,X",   3, 4 }, // 0x1D
 	{ "ASL $%02X%02X,X",   3, 7 }, // 0x1E
-	{ "BBR1 $%02X",        2, 2 }, // 0x1F
+	{ "BBR1 $%02X,$%02X",  3, 2 }, // 0x1F
 	{ "JSR $%02X%02X",     3, 6 }, // 0x20
 	{ "AND ($%02X,X)",     2, 6 }, // 0x21
 	{ "???",               1, 1 }, // 0x22
@@ -80,7 +80,7 @@ struct instruction_s instr_table[] =
 	{ "BIT $%02X%02X",     3, 4 }, // 0x2C
 	{ "AND $%02X%02X",     3, 4 }, // 0x2D
 	{ "ROL $%02X%02X",     3, 6 }, // 0x2E
-	{ "BBR2 $%02X",        2, 2 }, // 0x2F
+	{ "BBR2 $%02X,$%02X",  3, 2 }, // 0x2F
 	{ "BMI $%02X",         2, 2 }, // 0x30
 	{ "AND ($%02X),Y",     2, 5 }, // 0x31
 	{ "AND ($%02X)",       2, 5 }, // 0x32
@@ -96,7 +96,7 @@ struct instruction_s instr_table[] =
 	{ "BIT $%02X%02X,X",   3, 4 }, // 0x3C
 	{ "AND $%02X%02X,X",   3, 4 }, // 0x3D
 	{ "ROL $%02X%02X,X",   3, 7 }, // 0x3E
-	{ "BBR3 $%02X",        2, 2 }, // 0x3F
+	{ "BBR3 $%02X,$%02X",  3, 2 }, // 0x3F
 	{ "RTI",               1, 6 }, // 0x40
 	{ "EOR ($%02X,X)",     2, 6 }, // 0x41
 	{ "???",               1, 1 }, // 0x42
@@ -112,7 +112,7 @@ struct instruction_s instr_table[] =
 	{ "JMP $%02X%02X",     3, 3 }, // 0x4C
 	{ "EOR $%02X%02X",     3, 4 }, // 0x4D
 	{ "LSR $%02X%02X",     3, 6 }, // 0x4E
-	{ "BBR4 $%02X",        2, 2 }, // 0x4F
+	{ "BBR4 $%02X,$%02X",  3, 2 }, // 0x4F
 	{ "BVC $%02X",         2, 2 }, // 0x50
 	{ "EOR ($%02X),Y",     2, 5 }, // 0x51
 	{ "EOR ($%02X)",       2, 5 }, // 0x52
@@ -128,7 +128,7 @@ struct instruction_s instr_table[] =
 	{ "???",               1, 1 }, // 0x5C
 	{ "EOR $%02X%02X,X",   3, 4 }, // 0x5D
 	{ "LSR $%02X%02X,X",   3, 7 }, // 0x5E
-	{ "BBR5 $%02X",        2, 2 }, // 0x5F
+	{ "BBR5 $%02X,$%02X",  3, 2 }, // 0x5F
 	{ "RTS",               1, 6 }, // 0x60
 	{ "ADC ($%02X,X)",     2, 6 }, // 0x61
 	{ "???",               1, 1 }, // 0x62
@@ -144,7 +144,7 @@ struct instruction_s instr_table[] =
 	{ "JMP ($%02X%02X)",   3, 5 }, // 0x6C
 	{ "ADC $%02X%02X",     3, 4 }, // 0x6D
 	{ "ROR $%02X%02X",     3, 6 }, // 0x6E
-	{ "BBR6 $%02X",        2, 2 }, // 0x6F
+	{ "BBR6 $%02X,$%02X",  3, 2 }, // 0x6F
 	{ "BVS $%02X",         2, 2 }, // 0x70
 	{ "ADC ($%02X),Y",     2, 5 }, // 0x71
 	{ "ADC ($%02X)",       2, 5 }, // 0x72
@@ -160,7 +160,7 @@ struct instruction_s instr_table[] =
 	{ "JMP ($%02X%02X,X)", 3, 6 }, // 0x7C
 	{ "ADC $%02X%02X,X",   3, 4 }, // 0x7D
 	{ "ROR $%02X%02X,X",   3, 7 }, // 0x7E
-	{ "BBR7 $%02X",        2, 2 }, // 0x7F
+	{ "BBR7 $%02X,$%02X",  3, 2 }, // 0x7F
 	{ "BRA $%02X",         2, 3 }, // 0x80
 	{ "STA ($%02X,X)",     2, 6 }, // 0x81
 	{ "???",               1, 1 }, // 0x82
@@ -176,7 +176,7 @@ struct instruction_s instr_table[] =
 	{ "STY $%02X%02X",     3, 4 }, // 0x8C
 	{ "STA $%02X%02X",     3, 4 }, // 0x8D
 	{ "STX $%02X%02X",     3, 4 }, // 0x8E
-	{ "BBS0 $%02X",        2, 2 }, // 0x8F
+	{ "BBS0 $%02X,$%02X",  3, 2 }, // 0x8F
 	{ "BCC $%02X",         2, 2 }, // 0x90
 	{ "STA ($%02X),Y",     2, 6 }, // 0x91
 	{ "STA ($%02X)",       2, 5 }, // 0x92
@@ -192,7 +192,7 @@ struct instruction_s instr_table[] =
 	{ "STZ $%02X%02X",     3, 4 }, // 0x9C
 	{ "STA $%02X%02X,X",   3, 5 }, // 0x9D
 	{ "STZ $%02X%02X,X",   3, 5 }, // 0x9E
-	{ "BBS1 $%02X",        2, 2 }, // 0x9F
+	{ "BBS1 $%02X,$%02X",  3, 2 }, // 0x9F
 	{ "LDY #$%02X",        2, 2 }, // 0xA0
 	{ "LDA ($%02X,X)",     2, 6 }, // 0xA1
 	{ "LDX #$%02X",        2, 2 }, // 0xA2
@@ -208,7 +208,7 @@ struct instruction_s instr_table[] =
 	{ "LDY $%02X%02X",     3, 4 }, // 0xAC
 	{ "LDA $%02X%02X",     3, 4 }, // 0xAD
 	{ "LDX $%02X%02X",     3, 4 }, // 0xAE
-	{ "BBS2 $%02X",        2, 2 }, // 0xAF
+	{ "BBS2 $%02X,$%02X",  3, 2 }, // 0xAF
 	{ "BCS $%02X",         2, 2 }, // 0xB0
 	{ "LDA ($%02X),Y",     2, 5 }, // 0xB1
 	{ "LDA ($%02X)",       2, 5 }, // 0xB2
@@ -224,7 +224,7 @@ struct instruction_s instr_table[] =
 	{ "LDY $%02X%02X,X",   3, 4 }, // 0xBC
 	{ "LDA $%02X%02X,X",   3, 4 }, // 0xBD
 	{ "LDX $%02X%02X,Y",   3, 4 }, // 0xBE
-	{ "BBS3 $%02X",        2, 2 }, // 0xBF
+	{ "BBS3 $%02X,$%02X",  3, 2 }, // 0xBF
 	{ "CPY #$%02X",        2, 2 }, // 0xC0
 	{ "CMP ($%02X,X)",     2, 6 }, // 0xC1
 	{ "???",               1, 1 }, // 0xC2
@@ -240,7 +240,7 @@ struct instruction_s instr_table[] =
 	{ "CPY $%02X%02X",     3, 4 }, // 0xCC
 	{ "CMP $%02X%02X",     3, 4 }, // 0xCD
 	{ "DEC $%02X%02X",     3, 6 }, // 0xCE
-	{ "BBS4 $%02X",        2, 2 }, // 0xCF
+	{ "BBS4 $%02X,$%02X",  3, 2 }, // 0xCF
 	{ "BNE $%02X",         2, 2 }, // 0xD0
 	{ "CMP ($%02X),Y",     2, 5 }, // 0xD1
 	{ "CMP ($%02X)",       2, 5 }, // 0xD2
@@ -256,7 +256,7 @@ struct instruction_s instr_table[] =
 	{ "???",               1, 1 }, // 0xDC
 	{ "CMP $%02X%02X,X",   3, 4 }, // 0xDD
 	{ "DEC $%02X%02X,X",   3, 7 }, // 0xDE
-	{ "BBS5 $%02X",        2, 2 }, // 0xDF
+	{ "BBS5 $%02X,$%02X",  3, 2 }, // 0xDF
 	{ "CPX #$%02X",        2, 2 }, // 0xE0
 	{ "SBC ($%02X,X)",     2, 6 }, // 0xE1
 	{ "???",               1, 1 }, // 0xE2
@@ -272,7 +272,7 @@ struct instruction_s instr_table[] =
 	{ "CPX $%02X%02X",     3, 4 }, // 0xEC
 	{ "SBC $%02X%02X",     3, 4 }, // 0xED
 	{ "INC $%02X%02X",     3, 6 }, // 0xEE
-	{ "BBS6 $%02X",        2, 2 }, // 0xEF
+	{ "BBS6 $%02X,$%02X",  3, 2 }, // 0xEF
 	{ "BEQ $%02X",         2, 2 }, // 0xF0
 	{ "SBC ($%02X),Y",     2, 5 }, // 0xF1
 	{ "SBC ($%02X)",       2, 5 }, // 0xF2
@@ -288,5 +288,5 @@ struct instruction_s instr_table[] =
 	{ "???",               1, 1 }, // 0xFC
 	{ "SBC $%02X%02X,X",   3, 4 }, // 0xFD
 	{ "INC $%02X%02X,X",   3, 7 }, // 0xFE
-	{ "BBS7 $%02X",        2, 2 }, // 0xFF
+	{ "BBS7 $%02X,$%02X",  3, 2 }, // 0xFF
 };

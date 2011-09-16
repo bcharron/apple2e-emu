@@ -7,7 +7,7 @@ MemoryRegion::MemoryRegion(uint16_t regionStart, uint16_t regionEnd, uint8_t dat
 	this->regionStart = regionStart;
 	this->regionEnd = regionEnd;
 
-	this->size = regionEnd - regionStart;
+	this->size = regionEnd - regionStart + 1;
 
 	this->data = new uint8_t[this->size];
 	memcpy(this->data, data, this->size);
@@ -28,7 +28,8 @@ uint16_t MemoryRegion::getEnd(void)
 	return(this->regionEnd);
 }
 
-/* Translate from absolute offset (ie, offset in the entire memory) to
+/* 
+ * Translate from absolute offset (ie, offset in the entire memory) to
  * the offset for this memory region. ie, if the entire memory is 65k,
  * this region is mapped at 10k and this region's size is 2k, then the
  * real offset should be between [0 , 2k-1].

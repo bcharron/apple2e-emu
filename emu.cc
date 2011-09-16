@@ -80,13 +80,17 @@ int main (int argc, char *argv[])
 		exit(1);
 	}
 
-	unsigned int size = machine.memory->getSize();
-	unsigned int x = 0;
+/*
+	unsigned int x = 0xD000;
 
 	do {
 		unsigned int len = machine.dumpInstruction(x);
 		x += len;
 	} while(x < machine.memory->getSize());
+*/
+
+		
+	machine.testCPU();
 
 	return (0);
 }

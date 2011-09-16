@@ -1,4 +1,5 @@
 CFLAGS=-Wall -ggdb
+CPPFLAGS=-Wall -ggdb
 CC=g++
 
 all: emu
