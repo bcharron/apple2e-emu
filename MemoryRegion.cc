@@ -2,20 +2,24 @@
 #include <string.h>
 #include "MemoryRegion.h"
 
-MemoryRegion::MemoryRegion(uint16_t regionStart, uint16_t regionEnd, uint8_t data[])
+MemoryRegion::MemoryRegion(uint16_t regionStart, uint16_t regionEnd)
+	: regionStart(regionStart),
+	  regionEnd(regionEnd),
+	  size(regionEnd - regionStart + 1)
 {
-	this->regionStart = regionStart;
-	this->regionEnd = regionEnd;
-
-	this->size = regionEnd - regionStart + 1;
-
 	this->data = new uint8_t[this->size];
-	memcpy(this->data, data, this->size);
+	memset(this->data, 0, this->size);
 }
 
 MemoryRegion::~MemoryRegion(void)
 {
 	delete[] this->data;
+}
+
+void
+MemoryRegion::setData(uint8_t data[])
+{
+	memcpy(this->data, data, this->size);
 }
 
 uint16_t MemoryRegion::getStart(void)

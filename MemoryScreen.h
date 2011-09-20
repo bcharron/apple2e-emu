@@ -25,5 +25,9 @@
 
 class MemoryScreen : public MemoryRegion
 {
+public:
+	MemoryScreen(void);
 	void write(uint16_t offset, uint8_t val);
+private:
+	uint8_t *auxData;
 };

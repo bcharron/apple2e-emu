@@ -2,15 +2,26 @@
 #include <fstream>
 #include <assert.h>
 #include <iomanip>
+#include <string.h>
 #include "Machine.h"
 #include "instr_table.h"
 
 using namespace std;
 
-Machine::Machine(unsigned int memorySize)
+Machine::Machine()
+	: cycles(0)
 {
-	this->memory = new MemoryBus(memorySize);
-	this->cycles = 0;
+	this->memory = new MemoryBus(64 * 1024);
+}
+
+bool
+Machine::init()
+{
+	MemoryScreen *screen = new MemoryScreen();
+
+	memory->addRegion(screen);
+
+	return(true);
 }
 
 bool
@@ -24,9 +35,14 @@ Machine::loadApple2eROM(string &filename)
 		file.read((char *) data, APPLE2E_ROM_SIZE);
 
 		// MemoryRegion *unknown1 = new MemoryRegion(0x0200, 0x02FF, &data[0x4100]);
-		MemoryRegion *diskController = new MemoryRegion(0x0600, 0x06FF, &data[0x0600]);
-		MemoryRegion *internal = new MemoryRegion(0xC100, 0xCFFF, &data[0x4100]);
-		MemoryRegion *main = new MemoryRegion(0xD000, 0xFFFF, &data[0x5000]);
+		MemoryRegion *diskController = new MemoryRegion(0x0600, 0x06FF);
+		diskController->setData(&data[0x0600]);
+
+		MemoryRegion *internal = new MemoryRegion(0xC100, 0xCFFF);
+		internal->setData(&data[0x4100]);
+
+		MemoryRegion *main = new MemoryRegion(0xD000, 0xFFFF);
+		main->setData(&data[0x5000]);
 
 		this->memory->addRegion(diskController);
 		this->memory->addRegion(internal);

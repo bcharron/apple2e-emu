@@ -23,6 +23,7 @@
 
 #include <string>
 #include "MemoryBus.h"
+#include "MemoryScreen.h"
 
 #define APPLE2E_ROM_SIZE 32768
 #define ROM_FILENAME "APPLE2E.ROM"
@@ -54,7 +55,8 @@ struct registers_s {
 class Machine
 {
 public:
-	Machine(unsigned int memorySize);
+	Machine();
+	bool init(void);
 	bool loadApple2eROM(std::string &filename);
 	unsigned int dumpInstruction(uint16_t offset);
 	void dumpFlags(spc_flags_t *flags, char *buf);

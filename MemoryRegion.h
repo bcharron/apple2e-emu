@@ -28,8 +28,9 @@
 class MemoryRegion
 {
 public:
-	MemoryRegion(uint16_t regionStart, uint16_t regionEnd, uint8_t *data);
+	MemoryRegion(uint16_t regionStart, uint16_t regionEnd);
 	~MemoryRegion(void);
+	void setData(uint8_t *data);
 	uint16_t getStart(void);
 	uint16_t getEnd(void);
 	uint8_t read(uint16_t offset);
