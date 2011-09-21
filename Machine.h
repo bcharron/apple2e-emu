@@ -28,6 +28,8 @@
 #define APPLE2E_ROM_SIZE 32768
 #define ROM_FILENAME "APPLE2E.ROM"
 #define OFFSET_PAGE_1 0x0100
+#define BOOTSTRAP_ADDRESS 0xFA62
+#define MONITOR_START 0xFF69
 
 typedef union spc_flags_u {
         struct {
@@ -60,11 +62,15 @@ public:
 	bool loadApple2eROM(std::string &filename);
 	unsigned int dumpInstruction(uint16_t offset);
 	void dumpFlags(spc_flags_t *flags, char *buf);
+	void dumpMemory(uint16_t offset, uint16_t len);
 	void dumpRegisters(void);
 	void executeNextInstruction(void);
 	void setPC(uint16_t pc);
 	uint16_t getPC(void);
 	bool testCPU(void);
+	std::string* getSubroutineHandle(uint16_t offset);
+	void dumpStack(uint16_t len);
+	void interactive(void);
 
 	MemoryBus *memory;
 

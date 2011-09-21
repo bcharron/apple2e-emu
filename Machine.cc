@@ -2,11 +2,36 @@
 #include <fstream>
 #include <assert.h>
 #include <iomanip>
+#include <sstream>
 #include <string.h>
 #include "Machine.h"
 #include "instr_table.h"
 
 using namespace std;
+
+/* Make a 16-bit value out of two 8-bit ones */
+uint16_t make16(uint8_t high, uint8_t low)
+{
+	uint16_t offset = ((uint16_t) high << 8) | low;
+
+	return(offset);
+}
+
+/* Get low byte of a 16-bit word */
+uint8_t get_low(uint16_t word)
+{
+	uint8_t low = (word & 0x00FF);
+
+	return(low);
+}
+
+/* Get high byte of a 16-bit word */
+uint8_t get_high(uint16_t word)
+{
+	uint8_t high = (word & 0xFF00) >> 8;
+
+	return(high);
+}
 
 Machine::Machine()
 	: cycles(0)
@@ -20,6 +45,13 @@ Machine::init()
 	MemoryScreen *screen = new MemoryScreen();
 
 	memory->addRegion(screen);
+
+	registers.a = 0x00;
+	registers.x = 0x00;
+	registers.y = 0x00;
+	registers.sp = 0xff;
+	registers.pc = BOOTSTRAP_ADDRESS; // Monitor start
+	registers.psw.val = 0;
 
 	return(true);
 }
@@ -114,6 +146,108 @@ Machine::dumpRegisters(void)
 */
 }
 
+bool isRelativeBranchInstruction(uint8_t opcode)
+{
+	bool result = false;
+
+	if ((opcode & 0x1F) == 0x10)
+		result = true;
+
+	return(result);
+}
+
+bool isBranchInstruction(uint8_t opcode)
+{
+	bool result = false;
+
+	if ((opcode & 0x1F) == 0x10 || opcode == 0x4C || opcode == 0x6C)
+		result = true;
+
+	return(result);
+}
+
+struct monitor_subroutines_offsets_s
+{
+	const char *name;
+	uint16_t offset;
+};
+
+struct monitor_subroutines_offsets_s monitor_subroutines_offsets[] =
+{
+	{ "BELL",   0xFF3A },
+	{ "BELL1",  0xFBDD },
+	{ "CLREOL", 0xFC9C },
+	{ "CLEOLZ", 0xFC9E },
+	{ "CLREOP", 0xFC42 },
+	{ "CLRSCR", 0xF832 },
+	{ "CLRTOP", 0xF836 },
+	{ "COUT",   0xFDED },
+	{ "COUT1",  0xFDF0 },
+	{ "CROUT",  0xFD8E },
+	{ "CROUT1", 0xFD8B },
+	{ "GETLNZ", 0xFD67 },
+	{ "GETLN",  0xFD6A },
+	{ "GETLN1", 0xFD6F },
+	{ "HLINE",  0xF819 },
+	{ "HOME",   0xFC58 },
+	{ "IOREST", 0xFF3F },
+	{ "IOSAVE", 0xFF4A },
+	{ "KEYIN",  0xFD1B },
+	{ "MOVE",   0xFE2C },
+	{ "NEXTCOL",0xF85F },
+	{ "PLOT",   0xF800 },
+	{ "PRBLNK", 0xF948 },
+	{ "PRBL2",  0xF94A },
+	{ "PRBYTE", 0xFDDA },
+	{ "PREAD",  0xFB1E },
+	{ "PRERR",  0xFF2D },
+	{ "PRHEX",  0xFDE3 },
+	{ "PRNTAX", 0xF941 },
+	{ "RDCHAR", 0xFD35 },
+	{ "RDKEY",  0xFD0C },
+	{ "READ",   0xFEFD },
+	{ "SCRN",   0xF871 },
+	{ "SETCOL", 0xF864 },
+	{ "SETINV", 0xFE80 },
+	{ "SETNORM",0xFE84 },
+	{ "VERIFY", 0xFE36 },
+	{ "VLINE",  0xF828 },
+	{ "WAIT",   0xFCA8 },
+	{ "WRITE",  0xFECD },
+};
+
+#define MONITOR_SUBROUTINES_OFFSET_LEN (sizeof(monitor_subroutines_offsets) / sizeof(struct monitor_subroutines_offsets_s))
+
+std::string*
+Machine::getSubroutineHandle(uint16_t offset)
+{
+	std::string *name = NULL;
+	unsigned int x;
+
+	for (x = 0; x < MONITOR_SUBROUTINES_OFFSET_LEN; x++) {
+		if (monitor_subroutines_offsets[x].offset == offset)
+			name = new std::string(monitor_subroutines_offsets[x].name);
+	}
+
+	return(name);
+}
+
+unsigned int getInstructionLen(uint8_t opcode)
+{
+	instruction_t *instr;
+	
+        if (opcode >= INSTR_TABLE_LEN) {
+                cerr << "Error: Opcode 0x" << hex << opcode << " is outside the instruction table" << endl;
+                return(0);
+        }
+
+	instr = &instr_table[opcode];
+
+	unsigned int len = instr->len;
+
+	return(len);
+}
+
 /* Returns number of bytes fetched for this instruction */
 unsigned int
 Machine::dumpInstruction(uint16_t offset)
@@ -173,33 +307,29 @@ Machine::dumpInstruction(uint16_t offset)
 			printf("   ");
 	}
 	
-	printf("%s\n", strbuf);
+	printf("%s", strbuf);
+
+	if (isRelativeBranchInstruction(opcode)) {
+		uint16_t dest = offset + len + (int8_t) memory->read(offset + 1);
+
+		printf("  ($%04X)", dest);
+	}
+
+	if (opcode == 0x20 || opcode == 0x4C) { // JSR || JMP abs
+		uint8_t operand1 = memory->read(offset + 1);
+		uint8_t operand2 = memory->read(offset + 2);
+
+		uint16_t dest = make16(operand2, operand1);
+
+		std::string *subroutine = getSubroutineHandle(dest);
+
+		if (subroutine)
+			printf(" ; %s", subroutine->c_str());
+	}
+
+	printf("\n");
 
 	return(len);
-}
-
-/* Make a 16-bit value out of two 8-bit ones */
-uint16_t make16(uint8_t high, uint8_t low)
-{
-	uint16_t offset = ((uint16_t) high << 8) | low;
-
-	return(offset);
-}
-
-/* Get low byte of a 16-bit word */
-uint8_t get_low(uint16_t word)
-{
-	uint8_t low = (word & 0x00FF);
-
-	return(low);
-}
-
-/* Get high byte of a 16-bit word */
-uint8_t get_high(uint16_t word)
-{
-	uint8_t high = (word & 0xFF00) >> 8;
-
-	return(high);
 }
 
 void
@@ -283,8 +413,13 @@ Machine::executeNextInstruction(void)
 		}
 
 		case 0x07:
+		{
+			break;
+		}
+
 		case 0x08:
 		{
+			do_php();
 			break;
 		}
 
@@ -494,6 +629,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x28:
 		{
+			do_plp();
 			break;
 		}
 
@@ -1933,19 +2069,19 @@ Machine::executeNextInstruction(void)
 }
 
 uint16_t
-Machine::get_absolute_x(uint8_t operand0, uint8_t operand1)
+Machine::get_absolute_x(uint8_t low, uint8_t high)
 {
 	// How is wrapping handled?
-	uint16_t offset = make16(operand1, operand0) + registers.x;
+	uint16_t offset = make16(high, low) + registers.x;
 
 	return(offset);
 }
 
 uint16_t
-Machine::get_absolute_y(uint8_t operand0, uint8_t operand1)
+Machine::get_absolute_y(uint8_t low, uint8_t high)
 {
 	// How is wrapping handled?
-	uint16_t offset = make16(operand1, operand0) + registers.y;
+	uint16_t offset = make16(high, low) + registers.y;
 
 	return(offset);
 }
@@ -2033,7 +2169,7 @@ Machine::do_asl_m(uint16_t offset)
 
 	val = val << 1;
 
-	registers.psw.f.z = (registers.a == 0); // XXX: Not sure? Should probably be (val == 0)
+	registers.psw.f.z = (val == 0);
 	registers.psw.f.n = ((val & 0x80) > 0);
 }
 
@@ -2179,7 +2315,7 @@ Machine::compare(uint8_t reg, uint8_t val)
 	uint8_t result = reg - val;
 
 	registers.psw.f.c = (reg >= val);
-	registers.psw.f.z = (reg == val);
+	registers.psw.f.z = (result == 0);
 	registers.psw.f.n = ((result & 0x80) != 0);
 }
 
@@ -2205,6 +2341,9 @@ void
 Machine::do_dea(void)
 {
 	registers.a--;
+
+	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.n = ((registers.a & 0x80) != 0)
 }
 
 void
@@ -2222,12 +2361,18 @@ void
 Machine::do_dex(void)
 {
 	registers.x--;
+
+	registers.psw.f.z = (registers.x == 0);
+	registers.psw.f.n = ((registers.x & 0x80) != 0)
 }
 
 void
 Machine::do_dey(void)
 {
 	registers.y--;
+
+	registers.psw.f.z = (registers.y == 0);
+	registers.psw.f.n = ((registers.y & 0x80) != 0)
 }
 
 void
@@ -2243,7 +2388,6 @@ void
 Machine::do_ina(void)
 {
 	registers.a++;
-
 	registers.psw.f.z = (registers.a == 0);
 	registers.psw.f.n = ((registers.a & 0x80) != 0);
 }
@@ -2284,11 +2428,13 @@ Machine::do_jmp(uint16_t offset)
 void
 Machine::do_jsr(uint16_t offset)
 {
-	uint8_t low = get_low(registers.pc);
-	uint8_t high = get_high(registers.pc);
+	// For some reason, (pc - 1) is pushed on the stack rather
+	// than pc.
+	uint8_t low = get_low(registers.pc - 1);
+	uint8_t high = get_high(registers.pc - 1);
 	
-	push_stack(low);
 	push_stack(high);
+	push_stack(low);
 	
 	registers.pc = offset;
 }
@@ -2298,6 +2444,7 @@ Machine::do_lda(uint8_t val)
 {
 	registers.a = val;
 	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
 }
 
 void
@@ -2305,6 +2452,7 @@ Machine::do_ldx(uint8_t val)
 {
 	registers.x = val;
 	registers.psw.f.z = (registers.x == 0);
+	registers.psw.f.n = ((registers.x & 0x80) != 0);
 }
 
 void
@@ -2312,26 +2460,27 @@ Machine::do_ldy(uint8_t val)
 {
 	registers.y = val;
 	registers.psw.f.z = (registers.y == 0);
+	registers.psw.f.n = ((registers.y & 0x80) != 0);
 }
 
 void
 Machine::do_ora(uint8_t val)
 {
-	this->registers.a |= val;
-
-	registers.psw.f.n = (registers.a & 0x80) >> 7;
+	registers.a |= val;
 	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
 }
 
 uint8_t
 Machine::rotate_left(uint8_t val)
 {
-	uint8_t temp_carry = (val & 0x80);
+	uint8_t new_carry = (val & 0x80);
 
-	val = (val << 1) + registers.psw.f.c;
+	val = (val << 1) | registers.psw.f.c;
 
-	registers.psw.f.c = (temp_carry != 0);
+	registers.psw.f.c = (new_carry != 0);
 	registers.psw.f.n = ((val & 0x80) != 0);
+	registers.psw.f.z = (val == 0);
 
 	return(val);
 }
@@ -2340,6 +2489,7 @@ uint8_t
 Machine::rotate_right(uint8_t val)
 {
 	uint8_t temp_carry = (val & 0x01);
+
 	val = (val >> 1);
 
 	registers.psw.f.n = registers.psw.f.c;
@@ -2367,8 +2517,7 @@ Machine::do_ror_m(uint16_t offset)
 
 	val = rotate_right(val);
 
-	// XXX: Not sure? Should probably be (val == 0)
-	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.z = (val == 0);
 
 	memory->write(offset, val);
 }
@@ -2377,8 +2526,6 @@ void
 Machine::do_rol_a(void)
 {
 	registers.a = rotate_left(registers.a);
-	
-	registers.psw.f.z = (registers.a == 0);
 }
 
 void
@@ -2388,9 +2535,6 @@ Machine::do_rol_m(uint16_t offset)
 
 	val = rotate_left(val);
 
-	// XXX: Not sure? Should probably be 'val == 0'
-	registers.psw.f.z = (registers.a == 0);
-
 	memory->write(offset, val);
 }
 
@@ -2398,8 +2542,11 @@ uint8_t
 Machine::shift_right(uint8_t val)
 {
 	registers.psw.f.c = val & 0x01;
+	registers.psw.f.n = 0;
 
 	val = (val >> 1);
+
+	registers.psw.f.z = (val == 0);
 
 	return(val);
 }
@@ -2408,11 +2555,6 @@ void
 Machine::do_lsr_a(void)
 {
 	registers.a = shift_right(registers.a);
-	
-	registers.psw.f.z = (registers.a == 0);
-	
-	// XXX: This make no sense.
-	// registers.psw.f.n
 }
 
 void
@@ -2421,8 +2563,6 @@ Machine::do_lsr_m(uint16_t offset)
 	uint8_t val = memory->read(offset);
 
 	val = shift_right(val);
-
-	registers.psw.f.z = (val == 0);
 
 	memory->write(offset, val);
 }
@@ -2497,18 +2637,21 @@ Machine::do_rts(void)
 	uint8_t low = pop_stack();
 	uint8_t high = pop_stack();
 	
-	registers.pc = make16(high, low);
+	registers.pc = make16(high, low) + 1;
 }
 
 void
 Machine::do_sbc(uint8_t val)
 {
+	// XXX: Verify this code
 	int temp = registers.a - val - (1 - registers.psw.f.c);
 	registers.a = registers.a - val - (1 - registers.psw.f.c);
 
+	// XXX: Missing BCD mode
 	registers.psw.f.c = ! ((registers.a & 0x80) != 0);
-	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.n = ((temp & 0x80) != 0);
 	registers.psw.f.v = (temp > 127 || temp < -128);
+	registers.psw.f.z = (registers.a == 0);
 }
 
 void
@@ -2520,6 +2663,7 @@ Machine::do_sec(void)
 void
 Machine::do_sed(void)
 {
+	printf("Warning: code enabled unimplemented BCD-mode\n");
 	registers.psw.f.d = 1;
 }
 
@@ -2557,12 +2701,16 @@ void
 Machine::do_tay(void)
 {
 	registers.y = registers.a;
+	registers.psw.f.n = ((registers.y & 0x80) != 0);
+	registers.psw.f.z = (registers.y == 0);
 }
 
 void
 Machine::do_tax(void)
 {
 	registers.x = registers.a;
+	registers.psw.f.n = ((registers.x & 0x80) != 0);
+	registers.psw.f.z = (registers.x == 0);
 }
 
 void
@@ -2589,12 +2737,16 @@ void
 Machine::do_tsx(void)
 {
 	registers.x = registers.sp;
+	registers.psw.f.n = ((registers.x & 0x80) != 0);
+	registers.psw.f.z = (registers.x == 0);
 }
 
 void
 Machine::do_txa(void)
 {
 	registers.a = registers.x;
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
+	registers.psw.f.z = (registers.a == 0);
 }
 
 void
@@ -2607,6 +2759,8 @@ void
 Machine::do_tya(void)
 {
 	registers.a = registers.y;
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
+	registers.psw.f.z = (registers.a == 0);
 }
 
 uint8_t
@@ -2680,5 +2834,224 @@ Machine::testCPU(void)
 	dumpRegisters();
 	assert(registers.sp == 0xFF && registers.a == 0xA5);
 
+	uint8_t low = get_low(offset + 3);
+	uint8_t high = get_high(offset + 3);
+
+	memory->write(offset++, 0x20); // JSR
+	memory->write(offset++, low);
+	memory->write(offset++, high);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.sp == 0xFD && registers.pc == offset);
+
+	uint8_t low2 = memory->read(0x1FE);
+	uint8_t high2 = memory->read(0x1FF);
+
+	assert(low2 == low && high2 == high);
+
 	return(true);
+}
+
+void
+Machine::dumpStack(uint16_t len)
+{
+	uint16_t x;
+	uint8_t sp = registers.sp;
+
+	for (x = 0; x < len; x++) {
+		uint16_t offset = (uint16_t) sp | OFFSET_PAGE_1;
+		printf("%04X (sp+%d): %02X\n", offset, x, memory->read(offset));
+		sp++;
+	}
+}
+
+void
+Machine::dumpMemory(uint16_t offset, uint16_t len)
+{
+	int x = 0;
+
+	while(len) {
+		printf("%04X  ", offset);
+		
+		for (x = 0; x < 16 && len > 0; x++) {
+			printf("%02X ", memory->read(offset + x));
+			len--;
+		}
+		
+		printf("   ");
+
+		for (x = 0; x < 16; x++) {
+			uint8_t c = memory->read(offset + x);
+			if (! isprint(c))
+				c = '.';
+
+			printf("%c", c);
+
+		}
+		
+		printf("\n");
+
+		offset += 16;
+	}
+}
+
+void
+Machine::interactive(void)
+{
+	std::string buf;
+
+	while(! cin.eof())
+	{		
+		cout << endl;
+
+		dumpInstruction(getPC());
+
+		cout << "> ";
+		getline(cin, buf);
+		if (buf.size() == 0) {
+			executeNextInstruction();
+			continue;
+		}
+
+		std::string cmd;
+		std::string arg("");
+
+		size_t pos = buf.find(' ');
+		if (pos != buf.npos) {
+			cmd = buf.substr(0, pos);
+			arg = buf.substr(pos);
+		} else {
+			cmd = buf;
+		}
+		
+		switch(cmd.at(0)) {
+		case '?':
+		case 'h':
+		{
+			printf("Help:\n");
+			printf("b $addr    Breakpoint on $addr\n");
+			printf("d [$addr]  Disassemble at PC, or $addr if it's given\n");
+			printf("h          This help\n");
+			printf("j $addr    Jump to $addr\n");
+			printf("p $addr    Print data at $addr\n");
+			printf("q          Quit\n");
+			printf("r          Dump Registers\n");
+			printf("s          Dump Stack\n");
+			printf("x          Step over\n");
+			printf("<enter>    Execute next instruction\n");
+			break;
+		}
+
+		case 'b':
+		{
+			std::istringstream istr(arg);
+			uint16_t offset;
+
+			if (istr >> hex >> offset) {
+				while (getPC() != offset)
+					executeNextInstruction();
+			} else {
+				cout << "Error: Invalid argument '" << arg << "'" << endl;
+				cout << "Usage: b $addr" << endl;
+				cout << "Example: b 0xff00" << endl;
+			}
+
+			break;
+		}
+
+		case 'd':
+		{
+			uint16_t offset = getPC();
+
+			if (arg.size() > 0) {
+				std::istringstream istr(arg);
+				
+				if (! (istr >> hex >> offset)) {
+					cout << "Error: Invalid argument '" << arg << "'" << endl;
+					cout << "Usage: d $addr" << endl;
+					cout << "Example: d 0xff00" << endl;
+				}
+			}
+			
+			uint8_t len;
+			for (int x = 0; x < 16; x++) {
+				len = dumpInstruction(offset);
+				offset += len;
+			}
+
+			break;
+		}
+
+		case 'j':
+		{
+			std::istringstream istr(arg);
+			uint16_t offset;
+
+			if (istr >> hex >> offset) {
+				setPC(offset);
+			} else {
+				cout << "Error: Invalid argument '" << arg << "'" << endl;
+				cout << "Usage: j <addr>" << endl;
+			}
+
+			cout << "Jumping to " << hex << offset << endl;
+			break;
+		}
+
+		case 'p':
+		{
+			std::istringstream istr(arg);
+			uint16_t offset;
+
+			if (istr >> hex >> offset) {
+				dumpMemory(offset, 64);
+			} else {
+				cout << "Error: Invalid argument '" << arg << "'" << endl;
+				cout << "Usage: p $addr" << endl;
+				cout << "Example: p 0x1234" << endl;
+			}
+
+			break;
+		}
+
+		case 's':
+		{
+			dumpStack(8);
+			break;
+		}
+
+		case 'r':
+		{
+			dumpRegisters();
+			break;
+		}
+
+		case 'q':
+		{
+			return;
+			break;
+		}
+
+		case 'x':
+		{
+			unsigned int len = getInstructionLen(memory->read(getPC()));
+			uint16_t next = getPC() + len;
+
+			printf("Executing until PC == %04X\n", next);
+			while (getPC() != next) {
+				executeNextInstruction();
+			}
+
+			break;
+		}
+
+		default:
+		{
+			cout << "Unknown command" << endl;
+			break;
+		}
+		}
+	}
+
 }

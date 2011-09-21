@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <iostream>
+#include <string.h> // strlen
 #include <string>
 #include "Machine.h"
 
@@ -49,16 +50,18 @@ int main (int argc, char *argv[])
 	}
 
 /*
-	unsigned int x = 0xD000;
+	unsigned int x = 0xFF69;
 
 	do {
 		unsigned int len = machine.dumpInstruction(x);
 		x += len;
 	} while(x < machine.memory->getSize());
 */
+//C23F  B9 44 C2    LDA $C244,Y
 
-		
-	machine.testCPU();
+	machine.interactive();
+
+	//machine.testCPU();
 
 	return (0);
 }
