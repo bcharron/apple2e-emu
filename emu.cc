@@ -59,9 +59,9 @@ int main (int argc, char *argv[])
 */
 //C23F  B9 44 C2    LDA $C244,Y
 
-	machine.interactive();
+	machine.testCPU();
 
-	//machine.testCPU();
+	machine.interactive();
 
 	return (0);
 }

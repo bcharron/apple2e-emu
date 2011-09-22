@@ -9,6 +9,10 @@
 
 using namespace std;
 
+/*
+ *   Utility functions
+ */
+
 /* Make a 16-bit value out of two 8-bit ones */
 uint16_t make16(uint8_t high, uint8_t low)
 {
@@ -31,6 +35,32 @@ uint8_t get_high(uint16_t word)
 	uint8_t high = (word & 0xFF00) >> 8;
 
 	return(high);
+}
+
+/* Convert from Binary Coded Decimal to binary */
+uint8_t from_bcd(uint8_t val)
+{
+	uint8_t result;
+
+	uint8_t low  = val & 0x0F;
+	uint8_t high = (val >> 4) & 0x0F;
+
+	result = high * 10 + low;
+
+	return(result);
+}
+
+/* Convert from binary to Binary Coded Decimal */
+uint8_t to_bcd(uint8_t val)
+{
+	uint8_t result;
+
+	uint8_t low = val % 10;
+	uint8_t high = val / 10;
+
+	result = (high << 4) | low;
+
+	return(result);
 }
 
 Machine::Machine()
@@ -2123,21 +2153,26 @@ Machine::get_indirect_zeropage(uint8_t zp_offset)
 void
 Machine::do_adc(uint8_t val)
 {
-	uint16_t result;
-	int overflow = 0;
+	int16_t result;
 
-	result = registers.a + val + registers.psw.f.c;
-
-	if (result > 0xff) {
-		overflow = 1;
-		result = result % 0x00ff;
+	if (registers.psw.f.d) {
+		// BCD mode
+		result = from_bcd(registers.a) + from_bcd(val) + registers.psw.f.c;		
+		registers.a = to_bcd(result % 100);
+		registers.psw.f.c = (result > 99);
+	} else {
+		// Binary mode
+		result = registers.a + val + registers.psw.f.c;
+		registers.a = (result & 0x00FF);
+		registers.psw.f.c = (result > 0xFF);
 	}
 
-	registers.a = result;
-
-	registers.psw.f.z = (registers.a == 0);
+	// One reference says "result == 0", but I think it would
+	// makes more sense if "A == 0", since for other operations is
+	// essentially checks if <reg> is zero.
+	registers.psw.f.v = (result < -128 || result > 127);
+	registers.psw.f.z = (result == 0);
 	registers.psw.f.n = ((registers.a & 0x80) != 0);
-	registers.psw.f.c = overflow;
 }
 
 void
@@ -2343,14 +2378,16 @@ Machine::do_dea(void)
 	registers.a--;
 
 	registers.psw.f.z = (registers.a == 0);
-	registers.psw.f.n = ((registers.a & 0x80) != 0)
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
 }
 
 void
 Machine::do_dec(uint16_t offset)
 {
 	uint8_t val = memory->read(offset);
+
 	val--;
+
 	memory->write(offset, val);
 
 	registers.psw.f.z = (val == 0);
@@ -2363,7 +2400,7 @@ Machine::do_dex(void)
 	registers.x--;
 
 	registers.psw.f.z = (registers.x == 0);
-	registers.psw.f.n = ((registers.x & 0x80) != 0)
+	registers.psw.f.n = ((registers.x & 0x80) != 0);
 }
 
 void
@@ -2372,7 +2409,7 @@ Machine::do_dey(void)
 	registers.y--;
 
 	registers.psw.f.z = (registers.y == 0);
-	registers.psw.f.n = ((registers.y & 0x80) != 0)
+	registers.psw.f.n = ((registers.y & 0x80) != 0);
 }
 
 void
@@ -2640,18 +2677,30 @@ Machine::do_rts(void)
 	registers.pc = make16(high, low) + 1;
 }
 
+/*
+ * SBC (SuBstract with Carry)
+ * When the carry is clear, SBC NUM performs the calculation A = A - NUM - 1
+ * When the carry is set, SBC NUM performs the calculation A = A - NUM
+*/
 void
 Machine::do_sbc(uint8_t val)
 {
-	// XXX: Verify this code
-	int temp = registers.a - val - (1 - registers.psw.f.c);
-	registers.a = registers.a - val - (1 - registers.psw.f.c);
+	int16_t result;
 
-	// XXX: Missing BCD mode
-	registers.psw.f.c = ! ((registers.a & 0x80) != 0);
-	registers.psw.f.n = ((temp & 0x80) != 0);
-	registers.psw.f.v = (temp > 127 || temp < -128);
-	registers.psw.f.z = (registers.a == 0);
+	if (registers.psw.f.d) {
+		// BCD mode
+		result = from_bcd(registers.a) - from_bcd(val) - (! registers.psw.f.c);
+		registers.a = to_bcd(result & 0x00FF);
+	} else {
+		// Binary mode
+		result = registers.a - val - (! registers.psw.f.c);
+		registers.a = result & 0x00FF;
+	}
+
+	registers.psw.f.c = (result >= 0);
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
+	registers.psw.f.v = (result < -128 || result > 127);
+	registers.psw.f.z = (result == 0);
 }
 
 void
@@ -2788,8 +2837,28 @@ Machine::push_stack(uint8_t val)
 bool
 Machine::testCPU(void)
 {
-	uint16_t offset = 0x0000;
+	printf("Starting CPU test..\n");
 
+	/* Test BCD routines */
+	uint8_t bcd_result = from_bcd(0x45) + from_bcd(0x05);
+	assert(bcd_result == 50);
+
+	bcd_result = from_bcd(0x10) + from_bcd(0x10);
+	assert(bcd_result == 20);
+
+	bcd_result = to_bcd(74);
+	assert(bcd_result == 0x74);
+
+	bcd_result = to_bcd(98);
+	assert(bcd_result == 0x98);
+
+	bcd_result = to_bcd(0);
+	assert(bcd_result == 0x00);
+
+	bcd_result = to_bcd(1);
+	assert(bcd_result == 0x01);
+
+	uint16_t offset = 0x0000;
 	setPC(offset);
 
 	dumpRegisters();
@@ -2821,6 +2890,7 @@ Machine::testCPU(void)
 	dumpRegisters();
 	assert(registers.sp == 0xFF);
 
+	/* Test stack operations */
 	memory->write(offset++, 0x48); // PHA
 	dumpInstruction(registers.pc);
 	executeNextInstruction();	
@@ -2845,10 +2915,146 @@ Machine::testCPU(void)
 	dumpRegisters();
 	assert(registers.sp == 0xFD && registers.pc == offset);
 
-	uint8_t low2 = memory->read(0x1FE);
-	uint8_t high2 = memory->read(0x1FF);
+	/* Test carry flag */
+	memory->write(offset++, 0x38); // SEC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.psw.f.c == 1);
 
-	assert(low2 == low && high2 == high);
+	memory->write(offset++, 0x18); // CLC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.psw.f.c == 0);
+
+	memory->write(offset++, 0xD8); // CLD
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.psw.f.d == 0);
+
+	memory->write(offset++, 0xA9); // LDA #$01
+	memory->write(offset++, 0x01);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x01);
+
+	/* ADC without Carry flag set */
+	memory->write(offset++, 0x69); // ADC #$01
+	memory->write(offset++, 0x01);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x02);
+
+	/* ADC with Carry flag set */
+	memory->write(offset++, 0x38); // SEC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$01
+	memory->write(offset++, 0x01);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0x69); // ADC #$01
+	memory->write(offset++, 0x01);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x03);
+
+	/* ADC overflow */
+	memory->write(offset++, 0x18); // CLC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$FF
+	memory->write(offset++, 0xFF);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0x69); // ADC #$01
+	memory->write(offset++, 0x01);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x00 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 1 && registers.psw.f.n == 0);
+
+	/* ADC overflow */
+	memory->write(offset++, 0x18); // CLC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$80
+	memory->write(offset++, 0x80);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0x69); // ADC #$0F
+	memory->write(offset++, 0x0F);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x8F && registers.psw.f.c == 0 && registers.psw.f.z == 0 && registers.psw.f.v == 1 && registers.psw.f.n == 1);
+
+	/* SBC with carry */
+	memory->write(offset++, 0x38); // SEC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$04
+	memory->write(offset++, 0x04);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xE9); // SBC #$02
+	memory->write(offset++, 0x02);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x02 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 0);
+
+	/* Test SBC zero flag */
+	memory->write(offset++, 0x38); // SEC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$04
+	memory->write(offset++, 0x04);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xE9); // SBC #$04
+	memory->write(offset++, 0x04);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x00 && registers.psw.f.c == 1 && registers.psw.f.z == 1 && registers.psw.f.v == 0 && registers.psw.f.n == 0);
+
+	/* SBC without carry flag */
+	memory->write(offset++, 0x18); // CLC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$04
+	memory->write(offset++, 0x04);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xE9); // SBC #$02
+	memory->write(offset++, 0x02);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0x01 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 0);
+
+	/* SBC negative values */
+	memory->write(offset++, 0x38); // SEC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$04
+	memory->write(offset++, 0x04);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xE9); // SBC #$05
+	memory->write(offset++, 0x05);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0xFF && registers.psw.f.c == 0 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 1);
+
+	printf("All tests OK!\n");
 
 	return(true);
 }
