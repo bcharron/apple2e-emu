@@ -21,9 +21,11 @@
  * Revision : $Id$
  */
 
-#include <string>
 #include "MemoryBus.h"
-#include "MemoryScreen.h"
+
+#include <string>
+
+#include "Screen.h"
 
 #define APPLE2E_ROM_SIZE 32768
 #define ROM_FILENAME "APPLE2E.ROM"
@@ -163,5 +165,6 @@ protected:
 
 	struct registers_s registers;
 	unsigned long int cycles;
+	Screen *screen;
 };
 

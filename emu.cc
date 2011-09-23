@@ -21,13 +21,16 @@
  * Revision : $Id$
  */
 
+#include "Machine.h"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <iostream>
 #include <string.h> // strlen
+#include <SDL/SDL.h>
+
+#include <iostream>
 #include <string>
-#include "Machine.h"
 
 using namespace std;
 
@@ -50,19 +53,9 @@ int main (int argc, char *argv[])
 		exit(1);
 	}
 
-/*
-	unsigned int x = 0xFF69;
-
-	do {
-		unsigned int len = machine.dumpInstruction(x);
-		x += len;
-	} while(x < machine.memory->getSize());
-*/
-//C23F  B9 44 C2    LDA $C244,Y
-
 	machine.testCPU();
 
-	machine.setPC(0xFF69);
+	machine.setPC(BOOTSTRAP_ADDRESS);
 	machine.interactive();
 
 	return (0);

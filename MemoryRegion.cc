@@ -1,11 +1,13 @@
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 #include "MemoryRegion.h"
 
-MemoryRegion::MemoryRegion(uint16_t regionStart, uint16_t regionEnd)
+MemoryRegion::MemoryRegion(uint16_t regionStart, uint16_t regionEnd, bool readonly)
 	: regionStart(regionStart),
 	  regionEnd(regionEnd),
-	  size(regionEnd - regionStart + 1)
+	  size((unsigned long) regionEnd - regionStart + 1),
+	  readonly(readonly)
 {
 	this->data = new uint8_t[this->size];
 	memset(this->data, 0, this->size);
@@ -32,7 +34,7 @@ uint16_t MemoryRegion::getEnd(void)
 	return(this->regionEnd);
 }
 
-uint16_t MemoryRegion::getSize(void)
+unsigned long MemoryRegion::getSize(void)
 {
 	return(this->size);
 }
@@ -69,5 +71,6 @@ void MemoryRegion::write(uint16_t offset, uint8_t val)
 
 	uint16_t regionOffset = translateOffset(offset);
 
-	data[regionOffset] = val;
+	if (! readonly)
+		data[regionOffset] = val;
 }

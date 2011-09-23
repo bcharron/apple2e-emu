@@ -1,10 +1,11 @@
+LDFLAGS=-lSDL
 CFLAGS=-Wall -ggdb
 CPPFLAGS=-Wall -ggdb
 CC=g++
 
 all: emu
 
-emu: Machine.o MemoryRegion.o MemoryBus.o MemoryScreen.o emu.o
+emu: Machine.o MemoryRegion.o MemoryBus.o MemorySoftSwitch.o Screen.o emu.o
 
 emu.o: emu.cc
 
@@ -14,7 +15,9 @@ MemoryBus.o: MemoryBus.cc MemoryBus.h
 
 MemoryRegion.o: MemoryRegion.cc MemoryBus.h
 
-MemoryScreen.o: MemoryScreen.cc MemoryScreen.h
+MemorySoftSwitch.o: MemorySoftSwitch.cc MemorySoftSwitch.h
+
+Screen.o: Screen.cc Screen.h
 
 clean:
 	rm -f *.o emu

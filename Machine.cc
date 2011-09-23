@@ -1,10 +1,13 @@
+#include "Machine.h"
+
+#include <assert.h>
+#include <string.h>
+
 #include <iostream>
 #include <fstream>
-#include <assert.h>
 #include <iomanip>
 #include <sstream>
-#include <string.h>
-#include "Machine.h"
+
 #include "instr_table.h"
 
 using namespace std;
@@ -75,10 +78,6 @@ Machine::init()
 	memory = new MemoryBus(64 * 1024);
 	memory->init();
 
-//	MemoryScreen *screen = new MemoryScreen();
-
-//	memory->addRegion(screen);	
-
 	registers.a = 0x00;
 	registers.x = 0x00;
 	registers.y = 0x00;
@@ -86,9 +85,33 @@ Machine::init()
 	registers.pc = BOOTSTRAP_ADDRESS; // Monitor start
 	registers.psw.val = 0;
 
+	MemoryRegion *mainRAM = memory->getRegion(REGION_MAIN_RAM);
+	MemoryRegion *auxRAM = memory->getRegion(REGION_AUX_RAM);
+	MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
+
+	screen = new Screen(mainRAM, auxRAM, switches);
+
+	if (! screen->init()) {
+		fprintf(stderr, "WARNING: Running in text mode\n");
+	}
+
 	return(true);
 }
 
+/*
+ * Table 8-1. APPLE2E.ROM file map
+
+ FromToDescription
+ 0x0000 0x01ff Empty
+ 0x0200 0x02ff Unknown, probably a slot 2 peripheral card rom
+ 0x0300 0x05ff Empty
+ 0x0600 0x06ff 16 Sector Disk II controller card ROM
+ 0x0700 0x0fff Empty
+ 0x1000 0x3fff Integer basic ROM ?
+ 0x4000 0x40ff Empty
+ 0x4100 0x4fff Internal $C100-$CFFF ROM
+ 0x5000 0x7fff Main $D000-$FFFF ROM
+ */
 bool
 Machine::loadApple2eROM(string &filename)
 {
@@ -101,20 +124,6 @@ Machine::loadApple2eROM(string &filename)
 
 		memory->setRegionData(REGION_INTERNAL_ROM, (0xCFFF - 0xC100 + 1), &data[0x4100]);
 		memory->setRegionData(REGION_MAIN_ROM, (0xFFFF - 0xD000 + 1), &data[0x5000]);
-
-		// MemoryRegion *unknown1 = new MemoryRegion(0x0200, 0x02FF, &data[0x4100]);
-//		MemoryRegion *diskController = new MemoryRegion(0x0600, 0x06FF);
-//		diskController->setData(&data[0x0600]);
-
-//		MemoryRegion *internal = new MemoryRegion(0xC100, 0xCFFF);
-//		internal->setData(&data[0x4100]);
-
-//		MemoryRegion *main = new MemoryRegion(0xD000, 0xFFFF);
-//		main->setData(&data[0x5000]);
-
-//		this->memory->addRegion(diskController);
-//		this->memory->addRegion(internal);
-//		this->memory->addRegion(main);
 
 		success = true;
 	} else {
@@ -1221,7 +1230,7 @@ Machine::executeNextInstruction(void)
 		case 0x7C:
 		{
 			// XXX: NMOS versions have a bug where, if
-			// offset = xxFF, than xxFF and xx00 are
+			// offset = xxFF, then xxFF and xx00 are
 			// fetched instead of xxFF and x100
 			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			uint8_t low = memory->read(offset);
@@ -3121,6 +3130,7 @@ enum command_values {
 	CMD_DUMP,
 	CMD_JUMP,
 	CMD_QUIT,
+	CMD_REDRAW,
 	CMD_SHOW_REGS,
 	CMD_SHOW_STACK,
 	CMD_STEP,
@@ -3142,6 +3152,7 @@ struct command_struct COMMAND_TABLE[] =
 	{ "p",      CMD_DUMP },
 	{ "q",      CMD_QUIT },
 	{ "quit",   CMD_QUIT },
+	{ "redraw", CMD_REDRAW },
 	{ "sr",     CMD_SHOW_REGS },
 	{ "ss",     CMD_SHOW_STACK },
 	{ "x",      CMD_STEP },
@@ -3187,130 +3198,136 @@ Machine::interactive(void)
 		}
 
 		switch(command) {
-		case CMD_HELP:
-		{
-			printf("Help:\n");
-			printf("b $addr    Breakpoint on $addr\n");
-			printf("d [$addr]  Disassemble at PC, or $addr if it's given\n");
-			printf("h          This help\n");
-			printf("j $addr    Jump to $addr\n");
-			printf("p $addr    Print data at $addr\n");
-			printf("q          Quit\n");
-			printf("sr         Dump Registers\n");
-			printf("ss         Dump Stack\n");
-			printf("x          Step over\n");
-			printf("<enter>    Execute next instruction\n");
-			break;
-		}
-
-		case CMD_BREAKPOINT:
-		{
-			std::istringstream istr(arg);
-			uint16_t offset;
-
-			if (istr >> hex >> offset) {
-				while (getPC() != offset)
-					executeNextInstruction();
-			} else {
-				cout << "Error: Invalid argument '" << arg << "'" << endl;
-				cout << "Usage: b $addr" << endl;
-				cout << "Example: b 0xff00" << endl;
+			case CMD_HELP:
+			{
+				printf("Help:\n");
+				printf("b $addr    Breakpoint on $addr\n");
+				printf("d [$addr]  Disassemble at PC, or $addr if it's given\n");
+				printf("h          This help\n");
+				printf("j $addr    Jump to $addr\n");
+				printf("p $addr    Print data at $addr\n");
+				printf("q          Quit\n");
+				printf("sr         Dump Registers\n");
+				printf("ss         Dump Stack\n");
+				printf("x          Step over\n");
+				printf("<enter>    Execute next instruction\n");
+				break;
 			}
 
-			break;
-		}
-
-		case CMD_DISASM:
-		{
-			uint16_t offset = getPC();
-
-			if (arg.size() > 0) {
+			case CMD_BREAKPOINT:
+			{
 				std::istringstream istr(arg);
-				
-				if (! (istr >> hex >> offset)) {
+				uint16_t offset;
+
+				if (istr >> hex >> offset) {
+					while (getPC() != offset)
+						executeNextInstruction();
+				} else {
 					cout << "Error: Invalid argument '" << arg << "'" << endl;
-					cout << "Usage: d $addr" << endl;
-					cout << "Example: d 0xff00" << endl;
+					cout << "Usage: b $addr" << endl;
+					cout << "Example: b 0xff00" << endl;
 				}
+
+				break;
 			}
+
+			case CMD_DISASM:
+			{
+				uint16_t offset = getPC();
+
+				if (arg.size() > 0) {
+					std::istringstream istr(arg);
+				
+					if (! (istr >> hex >> offset)) {
+						cout << "Error: Invalid argument '" << arg << "'" << endl;
+						cout << "Usage: d $addr" << endl;
+						cout << "Example: d 0xff00" << endl;
+					}
+				}
 			
-			uint8_t len;
-			for (int x = 0; x < 16; x++) {
-				len = dumpInstruction(offset);
-				offset += len;
+				uint8_t len;
+				for (int x = 0; x < 16; x++) {
+					len = dumpInstruction(offset);
+					offset += len;
+				}
+
+				break;
 			}
 
-			break;
-		}
+			case CMD_JUMP:
+			{
+				std::istringstream istr(arg);
+				uint16_t offset;
 
-		case CMD_JUMP:
-		{
-			std::istringstream istr(arg);
-			uint16_t offset;
+				if (istr >> hex >> offset) {
+					setPC(offset);
+				} else {
+					cout << "Error: Invalid argument '" << arg << "'" << endl;
+					cout << "Usage: j <addr>" << endl;
+				}
 
-			if (istr >> hex >> offset) {
-				setPC(offset);
-			} else {
-				cout << "Error: Invalid argument '" << arg << "'" << endl;
-				cout << "Usage: j <addr>" << endl;
+				cout << "Jumping to " << hex << offset << endl;
+				break;
 			}
 
-			cout << "Jumping to " << hex << offset << endl;
-			break;
-		}
+			case CMD_DUMP:
+			{
+				std::istringstream istr(arg);
+				uint16_t offset;
 
-		case CMD_DUMP:
-		{
-			std::istringstream istr(arg);
-			uint16_t offset;
+				if (istr >> hex >> offset) {
+					dumpMemory(offset, 64);
+				} else {
+					cout << "Error: Invalid argument '" << arg << "'" << endl;
+					cout << "Usage: p $addr" << endl;
+					cout << "Example: p 0x1234" << endl;
+				}
 
-			if (istr >> hex >> offset) {
-				dumpMemory(offset, 64);
-			} else {
-				cout << "Error: Invalid argument '" << arg << "'" << endl;
-				cout << "Usage: p $addr" << endl;
-				cout << "Example: p 0x1234" << endl;
+				break;
 			}
 
-			break;
-		}
-
-		case CMD_SHOW_STACK:
-		{
-			dumpStack(8);
-			break;
-		}
-
-		case CMD_SHOW_REGS:
-		{
-			dumpRegisters();
-			break;
-		}
-
-		case CMD_QUIT:
-		{
-			return;
-			break;
-		}
-
-		case CMD_STEP:
-		{
-			unsigned int len = getInstructionLen(memory->read(getPC()));
-			uint16_t next = getPC() + len;
-
-			printf("Executing until PC == %04X\n", next);
-			while (getPC() != next) {
-				executeNextInstruction();
+			case CMD_REDRAW:
+			{
+				screen->redraw();
+				break;
 			}
 
-			break;
-		}
+			case CMD_SHOW_STACK:
+			{
+				dumpStack(8);
+				break;
+			}
 
-		default:
-		{
-			cout << "Unknown command" << endl;
-			break;
-		}
+			case CMD_SHOW_REGS:
+			{
+				dumpRegisters();
+				break;
+			}
+
+			case CMD_QUIT:
+			{
+				return;
+				break;
+			}
+
+			case CMD_STEP:
+			{
+				unsigned int len = getInstructionLen(memory->read(getPC()));
+				uint16_t next = getPC() + len;
+
+				printf("Executing until PC == %04X\n", next);
+				while (getPC() != next) {
+					executeNextInstruction();
+				}
+
+				break;
+			}
+
+			default:
+			{
+				cout << "Unknown command" << endl;
+				break;
+			}
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- * MemoryRegion.h - <description>
+ * Screen.h - <description>
  * Copyright (C) 2011 Benjamin Charron <bcharron@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -16,37 +16,34 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * MemoryRegion.h - Benjamin Charron <bcharron@pobox.com>
- * Created  : Mon Sep 12 15:01:21 2011
+ * Screen.h - Benjamin Charron <bcharron@pobox.com>
+ * Created  : Thu Sep 22 23:38:54 2011
  * Revision : $Id$
  */
 
-#ifndef _MEMORYREGION_H
-#define _MEMORYREGION_H
-#include <stdint.h>
+#ifndef _SCREEN_H
+#define _SCREEN_H
 
-#define REGION_RO true
-#define REGION_RW false
+#include <SDL/SDL.h>
 
-class MemoryRegion
+#include "MemoryRegion.h"
+#include "MemorySoftSwitch.h"
+
+class Screen
 {
 public:
-	MemoryRegion(uint16_t regionStart, uint16_t regionEnd, bool readonly);
-	~MemoryRegion(void);
-	void setData(uint8_t *data);
-	uint16_t getStart(void);
-	uint16_t getEnd(void);
-	uint8_t read(uint16_t offset);
-	virtual void write(uint16_t offset, uint8_t val);
-	unsigned long getSize(void);
-protected:
-	uint16_t translateOffset(uint16_t offset);
+	Screen(MemoryRegion *mainRegion, MemoryRegion *auxRegion, MemorySoftSwitch *switches);
+	bool init(void);
+	void redraw(void);
 
-	uint16_t regionStart;
-	uint16_t regionEnd;
-	unsigned long size;
-	uint8_t *data;
-	bool readonly;
+private:
+	void redrawText(void);
+	void redrawGraphics(void);
+
+	MemoryRegion *mainRegion;
+	MemoryRegion *auxRegion;
+	MemorySoftSwitch *switches;
+	SDL_Surface *sdl_screen;
 };
 
 #endif
