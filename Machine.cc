@@ -66,15 +66,18 @@ uint8_t to_bcd(uint8_t val)
 Machine::Machine()
 	: cycles(0)
 {
-	this->memory = new MemoryBus(64 * 1024);
+
 }
 
 bool
 Machine::init()
 {
-	MemoryScreen *screen = new MemoryScreen();
+	memory = new MemoryBus(64 * 1024);
+	memory->init();
 
-	memory->addRegion(screen);
+//	MemoryScreen *screen = new MemoryScreen();
+
+//	memory->addRegion(screen);	
 
 	registers.a = 0x00;
 	registers.x = 0x00;
@@ -96,19 +99,22 @@ Machine::loadApple2eROM(string &filename)
 	if (file.is_open()) {
 		file.read((char *) data, APPLE2E_ROM_SIZE);
 
+		memory->setRegionData(REGION_INTERNAL_ROM, (0xCFFF - 0xC100 + 1), &data[0x4100]);
+		memory->setRegionData(REGION_MAIN_ROM, (0xFFFF - 0xD000 + 1), &data[0x5000]);
+
 		// MemoryRegion *unknown1 = new MemoryRegion(0x0200, 0x02FF, &data[0x4100]);
-		MemoryRegion *diskController = new MemoryRegion(0x0600, 0x06FF);
-		diskController->setData(&data[0x0600]);
+//		MemoryRegion *diskController = new MemoryRegion(0x0600, 0x06FF);
+//		diskController->setData(&data[0x0600]);
 
-		MemoryRegion *internal = new MemoryRegion(0xC100, 0xCFFF);
-		internal->setData(&data[0x4100]);
+//		MemoryRegion *internal = new MemoryRegion(0xC100, 0xCFFF);
+//		internal->setData(&data[0x4100]);
 
-		MemoryRegion *main = new MemoryRegion(0xD000, 0xFFFF);
-		main->setData(&data[0x5000]);
+//		MemoryRegion *main = new MemoryRegion(0xD000, 0xFFFF);
+//		main->setData(&data[0x5000]);
 
-		this->memory->addRegion(diskController);
-		this->memory->addRegion(internal);
-		this->memory->addRegion(main);
+//		this->memory->addRegion(diskController);
+//		this->memory->addRegion(internal);
+//		this->memory->addRegion(main);
 
 		success = true;
 	} else {
@@ -3102,6 +3108,47 @@ Machine::dumpMemory(uint16_t offset, uint16_t len)
 	}
 }
 
+// This struct only exists to permit using a switch() statement
+struct command_struct {
+	const char *name;
+	int value;
+};
+
+enum command_values {
+	CMD_HELP,
+	CMD_BREAKPOINT,
+	CMD_DISASM,
+	CMD_DUMP,
+	CMD_JUMP,
+	CMD_QUIT,
+	CMD_SHOW_REGS,
+	CMD_SHOW_STACK,
+	CMD_STEP,
+	CMD_UNKNOWN
+};
+
+struct command_struct COMMAND_TABLE[] =
+{
+	{ "?",      CMD_HELP },
+	{ "b",      CMD_BREAKPOINT },
+	{ "break",  CMD_BREAKPOINT },
+	{ "d",      CMD_DISASM },
+	{ "disasm", CMD_DISASM },
+	{ "dump",   CMD_DUMP },
+	{ "h",      CMD_HELP },
+	{ "help",   CMD_HELP },
+	{ "j",      CMD_JUMP },
+	{ "jump",   CMD_JUMP },
+	{ "p",      CMD_DUMP },
+	{ "q",      CMD_QUIT },
+	{ "quit",   CMD_QUIT },
+	{ "sr",     CMD_SHOW_REGS },
+	{ "ss",     CMD_SHOW_STACK },
+	{ "x",      CMD_STEP },
+};
+
+#define COMMAND_TABLE_LEN (sizeof(COMMAND_TABLE) / sizeof(struct command_struct))
+
 void
 Machine::interactive(void)
 {
@@ -3130,10 +3177,17 @@ Machine::interactive(void)
 		} else {
 			cmd = buf;
 		}
-		
-		switch(cmd.at(0)) {
-		case '?':
-		case 'h':
+
+		// enum command_values command = CMD_UNKNOWN;
+		int command = CMD_UNKNOWN;
+
+		for (unsigned int x = 0; x < COMMAND_TABLE_LEN; x++) {
+			if (cmd.compare(COMMAND_TABLE[x].name) == 0)
+				command = COMMAND_TABLE[x].value;
+		}
+
+		switch(command) {
+		case CMD_HELP:
 		{
 			printf("Help:\n");
 			printf("b $addr    Breakpoint on $addr\n");
@@ -3142,14 +3196,14 @@ Machine::interactive(void)
 			printf("j $addr    Jump to $addr\n");
 			printf("p $addr    Print data at $addr\n");
 			printf("q          Quit\n");
-			printf("r          Dump Registers\n");
-			printf("s          Dump Stack\n");
+			printf("sr         Dump Registers\n");
+			printf("ss         Dump Stack\n");
 			printf("x          Step over\n");
 			printf("<enter>    Execute next instruction\n");
 			break;
 		}
 
-		case 'b':
+		case CMD_BREAKPOINT:
 		{
 			std::istringstream istr(arg);
 			uint16_t offset;
@@ -3166,7 +3220,7 @@ Machine::interactive(void)
 			break;
 		}
 
-		case 'd':
+		case CMD_DISASM:
 		{
 			uint16_t offset = getPC();
 
@@ -3189,7 +3243,7 @@ Machine::interactive(void)
 			break;
 		}
 
-		case 'j':
+		case CMD_JUMP:
 		{
 			std::istringstream istr(arg);
 			uint16_t offset;
@@ -3205,7 +3259,7 @@ Machine::interactive(void)
 			break;
 		}
 
-		case 'p':
+		case CMD_DUMP:
 		{
 			std::istringstream istr(arg);
 			uint16_t offset;
@@ -3221,25 +3275,25 @@ Machine::interactive(void)
 			break;
 		}
 
-		case 's':
+		case CMD_SHOW_STACK:
 		{
 			dumpStack(8);
 			break;
 		}
 
-		case 'r':
+		case CMD_SHOW_REGS:
 		{
 			dumpRegisters();
 			break;
 		}
 
-		case 'q':
+		case CMD_QUIT:
 		{
 			return;
 			break;
 		}
 
-		case 'x':
+		case CMD_STEP:
 		{
 			unsigned int len = getInstructionLen(memory->read(getPC()));
 			uint16_t next = getPC() + len;

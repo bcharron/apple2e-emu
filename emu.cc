@@ -31,7 +31,8 @@
 
 using namespace std;
 
-// The Apple IIe CPU is a 6502B ("a high-speed version of 6502")
+// The original Apple IIe (AKA Apple ][) is a 6502B ("a high-speed version of 6502")
+// The enhanced Apple IIe (AKA Apple //e) is a 65C02
 void usage(char *argv0)
 {
 	printf("Usage: %s <file.dsk>\n", argv0);
@@ -61,6 +62,7 @@ int main (int argc, char *argv[])
 
 	machine.testCPU();
 
+	machine.setPC(0xFF69);
 	machine.interactive();
 
 	return (0);

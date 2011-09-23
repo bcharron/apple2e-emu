@@ -35,6 +35,7 @@ public:
 	uint16_t getEnd(void);
 	uint8_t read(uint16_t offset);
 	virtual void write(uint16_t offset, uint8_t val);
+	uint16_t getSize(void);
 protected:
 	uint16_t translateOffset(uint16_t offset);
 

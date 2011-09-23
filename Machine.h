@@ -38,7 +38,7 @@ typedef union spc_flags_u {
                 unsigned int i : 1; // Interrupt Enable
                 unsigned int d : 1; // Binary Coded Decimal
                 unsigned int b : 1; // Break
-                unsigned int p : 1; // Direct Page
+                unsigned int p : 1; // Reserved
                 unsigned int v : 1; // Overflow
                 unsigned int n : 1; // Negative
         } f;

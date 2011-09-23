@@ -32,6 +32,11 @@ uint16_t MemoryRegion::getEnd(void)
 	return(this->regionEnd);
 }
 
+uint16_t MemoryRegion::getSize(void)
+{
+	return(this->size);
+}
+
 /* 
  * Translate from absolute offset (ie, offset in the entire memory) to
  * the offset for this memory region. ie, if the entire memory is 65k,
