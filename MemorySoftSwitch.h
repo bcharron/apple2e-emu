@@ -40,6 +40,9 @@ public:
 	bool isSlotCXROM(void) { return(slotCXROM); }
 	bool isSlotC3ROM(void) { return(slotC3ROM); }
 
+	void setKeyboardData(uint8_t val);
+	void doKeyboardStrobe(void);
+
 private:
 	void write(uint16_t offset, uint8_t byte);
 	uint8_t read(uint16_t offset);
@@ -60,4 +63,6 @@ private:
 	bool bBank2;     // 0: Read from bank 1.  1: Read from bank 2.
 	bool slotCXROM;  // 0: Read from internal ROM  1: Read from expansion ROM
 	bool slotC3ROM;  // 0: Read from 80-col firmware  1: Read from expansion ROM
+	uint8_t keyboardData; //
+	bool keyboardStrobe;
 };

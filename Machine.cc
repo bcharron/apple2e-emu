@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <time.h>
 
 #include <iostream>
 #include <fstream>
@@ -89,7 +90,7 @@ Machine::init()
 	MemoryRegion *auxRAM = memory->getRegion(REGION_AUX_RAM);
 	MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
 
-	screen = new Screen(mainRAM, auxRAM, switches);
+	screen = new Screen(640, 480, mainRAM, auxRAM, switches);
 
 	if (! screen->init()) {
 		fprintf(stderr, "WARNING: Running in text mode\n");
@@ -2263,8 +2264,8 @@ Machine::do_bit(uint8_t val)
 {	
 	val = val & registers.a;
 
-	registers.psw.f.v = ((val & 0x40) > 0);
-	registers.psw.f.n = ((val & 0x80) > 0);
+	registers.psw.f.v = ((val & 0x40) != 0);
+	registers.psw.f.n = ((val & 0x80) != 0);
 	registers.psw.f.z = (val == 0);
 }
 
@@ -3129,11 +3130,14 @@ enum command_values {
 	CMD_DISASM,
 	CMD_DUMP,
 	CMD_JUMP,
+	CMD_KEY,
 	CMD_QUIT,
 	CMD_REDRAW,
+	CMD_RUN,
 	CMD_SHOW_REGS,
 	CMD_SHOW_STACK,
 	CMD_STEP,
+	CMD_WRITE,
 	CMD_UNKNOWN
 };
 
@@ -3149,13 +3153,17 @@ struct command_struct COMMAND_TABLE[] =
 	{ "help",   CMD_HELP },
 	{ "j",      CMD_JUMP },
 	{ "jump",   CMD_JUMP },
+	{ "key",    CMD_KEY  },
 	{ "p",      CMD_DUMP },
 	{ "q",      CMD_QUIT },
 	{ "quit",   CMD_QUIT },
 	{ "redraw", CMD_REDRAW },
+	{ "r",      CMD_RUN },
+	{ "run",    CMD_RUN },
 	{ "sr",     CMD_SHOW_REGS },
 	{ "ss",     CMD_SHOW_STACK },
 	{ "x",      CMD_STEP },
+	{ "w",      CMD_WRITE },
 };
 
 #define COMMAND_TABLE_LEN (sizeof(COMMAND_TABLE) / sizeof(struct command_struct))
@@ -3201,16 +3209,19 @@ Machine::interactive(void)
 			case CMD_HELP:
 			{
 				printf("Help:\n");
-				printf("b $addr    Breakpoint on $addr\n");
-				printf("d [$addr]  Disassemble at PC, or $addr if it's given\n");
-				printf("h          This help\n");
-				printf("j $addr    Jump to $addr\n");
-				printf("p $addr    Print data at $addr\n");
-				printf("q          Quit\n");
-				printf("sr         Dump Registers\n");
-				printf("ss         Dump Stack\n");
-				printf("x          Step over\n");
-				printf("<enter>    Execute next instruction\n");
+				printf("b $addr        Breakpoint on $addr\n");
+				printf("d [$addr]      Disassemble at PC, or $addr if it's given\n");
+				printf("dump $addr     Print hex data at $addr\n");
+				printf("h              This help\n");
+				printf("j $addr        Jump to $addr\n");
+				printf("key $xx        Emulate key $xx being typed-in\n");
+				printf("p $addr        Print data at $addr\n");
+				printf("q              Quit\n");
+				printf("sr             Show Registers\n");
+				printf("ss             Show Stack\n");
+				printf("x              Step over\n");
+				printf("w $addr $byte  Write $byte at $addr (ie, POKE)\n");
+				printf("<enter>        Execute next instruction\n");
 				break;
 			}
 
@@ -3270,6 +3281,24 @@ Machine::interactive(void)
 				break;
 			}
 
+			case CMD_KEY:
+			{
+				std::istringstream istr(arg);
+				uint16_t key;
+
+				if (istr >> hex >> key) {
+					MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
+					switches->setKeyboardData(key & 0x00FF);
+					switches->doKeyboardStrobe();
+
+					cout << "Added key $" << hex << key << " to keyboard buffer." << endl;
+				} else {
+					cout << "Error: Invalid argument '" << arg << "'" << endl;
+					cout << "Example usage: key 0x61" << endl;
+				}
+				break;
+			}
+
 			case CMD_DUMP:
 			{
 				std::istringstream istr(arg);
@@ -3318,6 +3347,76 @@ Machine::interactive(void)
 				printf("Executing until PC == %04X\n", next);
 				while (getPC() != next) {
 					executeNextInstruction();
+				}
+
+				break;
+			}
+
+			case CMD_WRITE:
+			{
+				std::istringstream istr(arg);
+				uint16_t offset;
+				uint8_t byte;
+				uint16_t val;
+
+				istr >> hex >> offset;
+				istr >> hex >> val;
+				byte = val;
+
+				memory->write(offset, byte);
+
+				printf("Writing $%02X to $%04X\n", byte, offset);
+				break;
+			}
+
+			case CMD_RUN:
+			{
+				struct timespec ts = { 0, 977 };
+				SDL_Event event;
+				bool quit = false;
+
+				SDL_EnableUNICODE(1);
+
+				while(! quit) {
+					executeNextInstruction();
+
+					// 1.023MHz / 60 Hz == 17050 cycles between refreshes
+					if (cycles > 17050 * 10) {
+						screen->redraw();
+						cycles = 0;
+					}
+					
+					int nbEvents = SDL_PollEvent(&event);
+
+					if (nbEvents > 0) {
+						// printf("Found %d events waiting.\n", nbEvents);
+
+						switch( event.type ){
+							/* Keyboard event */
+							/* Pass the event data onto PrintKeyInfo() */
+							case SDL_KEYDOWN:
+							{
+								printf("Key event! %c\n", event.key.keysym.unicode);
+								MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
+								switches->setKeyboardData(event.key.keysym.unicode & 0x00FF);
+								switches->doKeyboardStrobe();
+								break;
+							}
+
+							/* SDL_QUIT event (window close) */
+							case SDL_QUIT:
+								quit = true;
+								break;
+
+							default:
+								break;
+						}
+					} else if (nbEvents < 0) {
+						fprintf(stderr, "SDL_PeepEvents(): %s\n", SDL_GetError());
+						exit(1);
+					}
+
+					// nanosleep(&ts, NULL);
 				}
 
 				break;

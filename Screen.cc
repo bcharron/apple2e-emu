@@ -25,12 +25,52 @@
 
 #include <SDL/SDL.h>
 
-Screen::Screen(MemoryRegion *mainRegion, MemoryRegion *auxRegion, MemorySoftSwitch *switches)
-	: mainRegion(mainRegion),
+Screen::Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion, 
+	       MemoryRegion *auxRegion, MemorySoftSwitch *switches)
+	: width(width),
+	  height(height),
+	  mainRegion(mainRegion),
 	  auxRegion(auxRegion),
 	  switches(switches),
 	  sdl_screen(NULL)
 {
+}
+
+/*
+ * Set the pixel at (x, y) to the given value
+ * NOTE: The surface must be locked before calling this!
+ */
+void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
+{
+	int bpp = surface->format->BytesPerPixel;
+	/* Here p is the address to the pixel we want to set */
+	Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+
+	switch(bpp) {
+		case 1:
+			*p = pixel;
+			break;
+
+		case 2:
+			*(Uint16 *)p = pixel;
+			break;
+
+		case 3:
+			if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
+				p[0] = (pixel >> 16) & 0xff;
+				p[1] = (pixel >> 8) & 0xff;
+				p[2] = pixel & 0xff;
+			} else {
+				p[0] = pixel & 0xff;
+				p[1] = (pixel >> 8) & 0xff;
+				p[2] = (pixel >> 16) & 0xff;
+			}
+			break;
+
+		case 4:
+			*(Uint32 *)p = pixel;
+			break;
+	}
 }
 
 bool
@@ -46,6 +86,16 @@ Screen::init(void)
 	sdl_screen = SDL_SetVideoMode(640, 480, 8, SDL_SWSURFACE);
 	if ( sdl_screen == NULL ) {
 		fprintf(stderr, "Couldn't set 640x480x8 video mode: %s\n", SDL_GetError());
+		return(false);
+	}
+
+	SDL_WM_SetCaption("Apple //e Emulator", "icon");
+
+	fontBuffer = new uint8_t[SCREEN_FONT_SIZE];
+
+	std::string videoROM = std::string("Apple IIe Video ROM US.bin");
+	if (! loadFont(videoROM)) {
+		fprintf(stderr, "Couldn't open video ROM %s\n", videoROM.c_str());
 		return(false);
 	}
 
@@ -69,19 +119,92 @@ Screen::redrawText(void)
 
 	if (switches->is80Col()) {
 		ptr = 0x400;
+
+		for (int y = 0; y < 24; y++) {
+			for (int x = 0; x < 40; x++) {
+				printf("%c", mainRegion->read(ptr + (y * 0x80) + x) & 0x7F);
+				printf("%c", auxRegion->read(ptr + (y * 0x80) + x) & 0x7F);
+			}
+
+			printf("\n");
+		}
 	} else {
 		ptr = 0x400;
 
 		for (int y = 0; y < 24; y++) {
 			for (int x = 0; x < 40; x++) {
-				printf("%c", mainRegion->read(ptr++) & 0x3F);
+				uint8_t c = mainRegion->read(ptr + (y * 0x80) + x) & 0x7F;
+
+				// printf("%c", c);
+				drawCharacter(x * 8, y * 8, c);
 			}
-			printf("\n");
+			//printf("\n");
 		}
 	}
+
+/*
+	for (int x = 0; x < 4096 / 8; x++)
+		drawCharacter(x * 8, ((x * 8) / 480) * 8, x);
+*/
+
+	//drawCharacter(0, 0, 0x61);
+	SDL_UpdateRect(sdl_screen, 0, 0, 0, 0);
 }
 
 void
 Screen::redrawGraphics(void)
 {
+}
+
+bool
+Screen::loadFont(std::string filename)
+{
+
+
+	FILE *f = fopen(filename.c_str(), "r");
+	if (! f) {
+		perror("fopen()");
+		return(false);
+	}
+
+	size_t len = fread(fontBuffer, 1, SCREEN_FONT_SIZE, f);
+	if (len != SCREEN_FONT_SIZE) {
+		fprintf(stderr, "Error reading font file %s: Expected %d bytes but read %lu\n", filename.c_str(), SCREEN_FONT_SIZE, len);
+		return(false);
+	}
+
+	fclose(f);
+
+	return(true);
+}
+
+void
+Screen::drawCharacter(int x, int y, int charIndex)
+{
+	Uint32 white = SDL_MapRGB(sdl_screen->format, 0xff, 0xff, 0xff);
+	Uint32 black = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x00);
+
+	/* Lock the screen for direct access to the pixels */
+	if ( SDL_MUSTLOCK(sdl_screen) ) {
+		if ( SDL_LockSurface(sdl_screen) < 0 ) {
+			fprintf(stderr, "Can't lock screen: %s\n", SDL_GetError());
+			return;
+		}
+	}
+
+	/* Draw each scanline, one by one */
+	for (int scanline = 0; scanline < 8; scanline++) {
+		for (uint8_t b = 0; b < 8; b++) {
+			uint8_t c = 0x01 << b;
+			uint8_t bit = fontBuffer[charIndex * 8 + scanline] & c;
+
+			Uint32 pixel = ((bit != 0) ? white : black);
+			putpixel(sdl_screen, x + b, y + scanline, pixel);
+		}
+	}
+
+	/* Lock the screen for direct access to the pixels */
+	if ( SDL_MUSTLOCK(sdl_screen) ) {
+		SDL_UnlockSurface(sdl_screen);
+	}
 }

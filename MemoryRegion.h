@@ -36,7 +36,7 @@ public:
 	void setData(uint8_t *data);
 	uint16_t getStart(void);
 	uint16_t getEnd(void);
-	uint8_t read(uint16_t offset);
+	virtual uint8_t read(uint16_t offset);
 	virtual void write(uint16_t offset, uint8_t val);
 	unsigned long getSize(void);
 protected:

@@ -23,6 +23,8 @@
 
 #include "MemorySoftSwitch.h"
 
+#include <stdio.h>
+
 MemorySoftSwitch::MemorySoftSwitch(uint16_t regionStart, uint16_t regionEnd, bool readonly)
 	: MemoryRegion(regionStart, regionEnd, readonly),
 	  altCharset(false),
@@ -40,8 +42,22 @@ MemorySoftSwitch::MemorySoftSwitch(uint16_t regionStart, uint16_t regionEnd, boo
 	  bankWrite(false),
 	  bBank2(false),
 	  slotCXROM(false),
-	  slotC3ROM(false)
+	  slotC3ROM(false),
+	  keyboardData(0x00),
+	  keyboardStrobe(false)
 {
+}
+
+void
+MemorySoftSwitch::doKeyboardStrobe(void)
+{
+	keyboardStrobe = true;
+}
+
+void
+MemorySoftSwitch::setKeyboardData(uint8_t val)
+{
+	keyboardData = val;
 }
 
 void
@@ -58,6 +74,37 @@ MemorySoftSwitch::write(uint16_t offset, uint8_t byte)
 		case 0xC001:
 		{
 			text80Store = true;
+			break;
+		}
+
+		case 0xC006:
+		{
+			slotCXROM = true;
+			break;
+		}
+
+		case 0xC007:
+		{
+			slotCXROM = false;
+			break;
+		}
+
+		case 0xC00A:
+		{
+			slotC3ROM = false;
+			break;
+		}
+
+		case 0xC00B:
+		{
+			slotC3ROM = true;
+			break;
+		}
+
+		case 0xC010:
+		{
+			// printf("0xC010: Strobe cleared.\n");
+			keyboardStrobe = false;
 			break;
 		}
 
@@ -149,18 +196,44 @@ MemorySoftSwitch::read(uint16_t offset)
 	uint8_t val = 0x00;
 
 	switch(offset) {
-		case 0xC01F:
+		case 0xC000:
 		{
-			val = (text80Col ? 0x80 : 0x00);
+			// printf("Reading from 0xC000\n");
+			val = keyboardData;
+
+			if (keyboardStrobe)
+				val |= 0x80;
+
 			break;
 		}
 
-		case 0xC01E:
+		case 0xC010:
 		{
-			val = (altCharset ? 0x80 : 0x00);
+			// printf("0xC010: Strobe cleared.\n");
+			val = (keyboardStrobe ? 0x80 : 0x00);
+			keyboardStrobe = false;
 			break;
 		}
-			
+
+		case 0xC015:
+		{
+			val = (slotCXROM ? 0x80 : 0x00);
+			break;
+		}
+
+		case 0xC017:
+		{
+			val = (slotC3ROM ? 0x80 : 0x00);
+			break;
+		}
+
+		case 0xC019:
+		{
+			// XXX: This is probably a factor of cycles.
+			val = vbl;
+			break;
+		}
+
 		case 0xC01A:
 		{
 			val = (text ? 0x80 : 0x00);
@@ -173,10 +246,15 @@ MemorySoftSwitch::read(uint16_t offset)
 			break;
 		}
 
-		case 0xC019:
+		case 0xC01E:
 		{
-			// XXX: This is probably a factor of cycles.
-			val = vbl;
+			val = (altCharset ? 0x80 : 0x00);
+			break;
+		}			
+
+		case 0xC01F:
+		{
+			val = (text80Col ? 0x80 : 0x00);
 			break;
 		}
 

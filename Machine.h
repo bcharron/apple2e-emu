@@ -32,6 +32,7 @@
 #define OFFSET_PAGE_1 0x0100
 #define BOOTSTRAP_ADDRESS 0xFA62
 #define MONITOR_START 0xFF69
+#define CYCLE_TIME .00000097751710654936f     // Seconds per cycle
 
 typedef union spc_flags_u {
         struct {

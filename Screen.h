@@ -26,24 +26,34 @@
 
 #include <SDL/SDL.h>
 
+#include <string>
+
 #include "MemoryRegion.h"
 #include "MemorySoftSwitch.h"
+
+#define SCREEN_FONT_SIZE 4096
 
 class Screen
 {
 public:
-	Screen(MemoryRegion *mainRegion, MemoryRegion *auxRegion, MemorySoftSwitch *switches);
+	Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion, MemoryRegion *auxRegion, MemorySoftSwitch *switches);
 	bool init(void);
 	void redraw(void);
+	void drawCharacter(int x, int y, int charIndex);
+	bool loadFont(std::string filename);
 
 private:
 	void redrawText(void);
 	void redrawGraphics(void);
 
+	unsigned int width;
+	unsigned int height;
+
 	MemoryRegion *mainRegion;
 	MemoryRegion *auxRegion;
 	MemorySoftSwitch *switches;
 	SDL_Surface *sdl_screen;
+	uint8_t *fontBuffer;
 };
 
 #endif

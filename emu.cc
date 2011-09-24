@@ -47,13 +47,15 @@ int main (int argc, char *argv[])
 	string romFilename(ROM_FILENAME);
 
 	machine.init();
+
+	printf("0x61: %c\n", 0x61);
 	
 	if (! machine.loadApple2eROM(romFilename)) {
 		cerr << "Could not load the apple ROM " << ROM_FILENAME << endl;
 		exit(1);
 	}
 
-	machine.testCPU();
+	// machine.testCPU();
 
 	machine.setPC(BOOTSTRAP_ADDRESS);
 	machine.interactive();
