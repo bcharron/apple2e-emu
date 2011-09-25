@@ -74,6 +74,8 @@ public:
 	std::string* getSubroutineHandle(uint16_t offset);
 	void dumpStack(uint16_t len);
 	void interactive(void);
+	void run(void);
+	void setPCBreakpoint(uint16_t offset);
 
 	MemoryBus *memory;
 
@@ -167,5 +169,7 @@ protected:
 	struct registers_s registers;
 	unsigned long int cycles;
 	Screen *screen;
+	bool pcBreakpointEnabled;
+	uint16_t pcBreakpointOffset;
 };
 

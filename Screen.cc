@@ -129,11 +129,19 @@ Screen::redrawText(void)
 			printf("\n");
 		}
 	} else {
+		// The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450
 		ptr = 0x400;
-
 		for (int y = 0; y < 24; y++) {
 			for (int x = 0; x < 40; x++) {
-				uint8_t c = mainRegion->read(ptr + (y * 0x80) + x) & 0x7F;
+				if (y < 8)
+					ptr = 0x400;
+				else if (y >= 8 && y < 16)
+					ptr = 0x428;
+				else
+					ptr = 0x450;
+
+				uint16_t offset = ptr + ((y % 8) * 0x80) + x;
+				uint8_t c = mainRegion->read(offset);
 
 				// printf("%c", c);
 				drawCharacter(x * 8, y * 8, c);
@@ -192,11 +200,16 @@ Screen::drawCharacter(int x, int y, int charIndex)
 		}
 	}
 
+	uint16_t charsetIndex = 0;
+
+	if (switches->isAltCharset())
+		charsetIndex = 2048;
+
 	/* Draw each scanline, one by one */
 	for (int scanline = 0; scanline < 8; scanline++) {
 		for (uint8_t b = 0; b < 8; b++) {
 			uint8_t c = 0x01 << b;
-			uint8_t bit = fontBuffer[charIndex * 8 + scanline] & c;
+			uint8_t bit = fontBuffer[charIndex * 8 + scanline + charsetIndex] & c;
 
 			Uint32 pixel = ((bit != 0) ? white : black);
 			putpixel(sdl_screen, x + b, y + scanline, pixel);

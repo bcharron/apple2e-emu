@@ -68,7 +68,9 @@ uint8_t to_bcd(uint8_t val)
 }
 
 Machine::Machine()
-	: cycles(0)
+	: cycles(0),
+	  pcBreakpointEnabled(false),
+	  pcBreakpointOffset(0x0000)
 {
 
 }
@@ -123,6 +125,7 @@ Machine::loadApple2eROM(string &filename)
 	if (file.is_open()) {
 		file.read((char *) data, APPLE2E_ROM_SIZE);
 
+		// memory->setRegionData(REGION_SLOT_ROMS, (0xC1FF - 0xC100) + 1, &data[0x0600]);
 		memory->setRegionData(REGION_INTERNAL_ROM, (0xCFFF - 0xC100 + 1), &data[0x4100]);
 		memory->setRegionData(REGION_MAIN_ROM, (0xFFFF - 0xD000 + 1), &data[0x5000]);
 
@@ -3118,6 +3121,78 @@ Machine::dumpMemory(uint16_t offset, uint16_t len)
 	}
 }
 
+void
+Machine::setPCBreakpoint(uint16_t offset)
+{
+	pcBreakpointOffset = offset;
+	pcBreakpointEnabled = true;
+}
+
+/*
+ * Run code until a user quits or a breakpoint is hit
+ */
+void
+Machine::run(void)
+{
+	struct timespec ts = { 0, 977 * 100 };
+	SDL_Event event;
+	bool quit = false;
+
+	SDL_EnableUNICODE(1);
+
+	while(! quit) {
+		if (pcBreakpointEnabled && getPC() == pcBreakpointOffset) {
+			// Eww. Not clean..
+			return;
+		}
+
+		executeNextInstruction();
+
+		// 1.023MHz / 60 Hz == 17050 cycles between refreshes
+		if (cycles > 17050 * 10) {
+			screen->redraw();
+			cycles = 0;
+		}
+					
+		int nbEvents = SDL_PollEvent(&event);
+
+		if (nbEvents > 0) {
+			// printf("Found %d events waiting.\n", nbEvents);
+
+			switch( event.type ){
+				/* Keyboard event */
+				case SDL_KEYDOWN:
+				{
+					printf("Key event! %c (0x%02X)\n", event.key.keysym.unicode, event.key.keysym.unicode);
+					MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
+					switches->setKeyboardData(event.key.keysym.unicode & 0x00FF);
+					switches->doKeyboardStrobe();
+					break;
+				}
+
+				/* SDL_QUIT event (window close) */
+				case SDL_QUIT:
+					quit = true;
+					break;
+
+				default:
+					break;
+			}
+		} else if (nbEvents < 0) {
+			fprintf(stderr, "SDL_PollEvents(): %s\n", SDL_GetError());
+			exit(1);
+		}
+
+		// Sleeping about ~100us every
+		// 100 cycles is easier on the
+		// CPU than sleeping 977ns
+		// every cycle.
+		if (cycles % 100 == 0) {
+			nanosleep(&ts, NULL);
+		}
+	}
+}
+
 // This struct only exists to permit using a switch() statement
 struct command_struct {
 	const char *name;
@@ -3133,6 +3208,7 @@ enum command_values {
 	CMD_KEY,
 	CMD_QUIT,
 	CMD_REDRAW,
+	CMD_RET,
 	CMD_RUN,
 	CMD_SHOW_REGS,
 	CMD_SHOW_STACK,
@@ -3159,6 +3235,7 @@ struct command_struct COMMAND_TABLE[] =
 	{ "quit",   CMD_QUIT },
 	{ "redraw", CMD_REDRAW },
 	{ "r",      CMD_RUN },
+	{ "ret",    CMD_RET },
 	{ "run",    CMD_RUN },
 	{ "sr",     CMD_SHOW_REGS },
 	{ "ss",     CMD_SHOW_STACK },
@@ -3217,6 +3294,8 @@ Machine::interactive(void)
 				printf("key $xx        Emulate key $xx being typed-in\n");
 				printf("p $addr        Print data at $addr\n");
 				printf("q              Quit\n");
+				printf("redraw         Redraw the screen\n");
+				printf("ret            Return from JSR\n");
 				printf("sr             Show Registers\n");
 				printf("ss             Show Stack\n");
 				printf("x              Step over\n");
@@ -3231,8 +3310,8 @@ Machine::interactive(void)
 				uint16_t offset;
 
 				if (istr >> hex >> offset) {
-					while (getPC() != offset)
-						executeNextInstruction();
+					setPCBreakpoint(offset);
+					run();
 				} else {
 					cout << "Error: Invalid argument '" << arg << "'" << endl;
 					cout << "Usage: b $addr" << endl;
@@ -3368,57 +3447,27 @@ Machine::interactive(void)
 				printf("Writing $%02X to $%04X\n", byte, offset);
 				break;
 			}
+			
+			case CMD_RET:
+			{
+				registers.sp++;
+
+				uint16_t offset = OFFSET_PAGE_1 | (registers.sp + 1);
+				uint8_t low = memory->read(offset);
+				uint8_t high = memory->read(offset + 1);
+				
+				offset = make16(high, low) + 1;
+
+				// There should be an Interactive::run() instead of it being in the switch()
+				while (getPC() != offset)
+					executeNextInstruction();
+				
+				break;
+			}
 
 			case CMD_RUN:
 			{
-				struct timespec ts = { 0, 977 };
-				SDL_Event event;
-				bool quit = false;
-
-				SDL_EnableUNICODE(1);
-
-				while(! quit) {
-					executeNextInstruction();
-
-					// 1.023MHz / 60 Hz == 17050 cycles between refreshes
-					if (cycles > 17050 * 10) {
-						screen->redraw();
-						cycles = 0;
-					}
-					
-					int nbEvents = SDL_PollEvent(&event);
-
-					if (nbEvents > 0) {
-						// printf("Found %d events waiting.\n", nbEvents);
-
-						switch( event.type ){
-							/* Keyboard event */
-							/* Pass the event data onto PrintKeyInfo() */
-							case SDL_KEYDOWN:
-							{
-								printf("Key event! %c\n", event.key.keysym.unicode);
-								MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
-								switches->setKeyboardData(event.key.keysym.unicode & 0x00FF);
-								switches->doKeyboardStrobe();
-								break;
-							}
-
-							/* SDL_QUIT event (window close) */
-							case SDL_QUIT:
-								quit = true;
-								break;
-
-							default:
-								break;
-						}
-					} else if (nbEvents < 0) {
-						fprintf(stderr, "SDL_PeepEvents(): %s\n", SDL_GetError());
-						exit(1);
-					}
-
-					// nanosleep(&ts, NULL);
-				}
-
+				run();
 				break;
 			}
 

@@ -62,7 +62,7 @@ MemoryBus::setRegionData(enum memory_regions regionNumber, uint16_t size, uint8_
 
 	MemoryRegion *region = regions[regionNumber];
 
-	assert(region != NULL && region->getSize() == size);
+	assert(region != NULL && region->getSize() >= size);
 
 	region->setData(data);
 }

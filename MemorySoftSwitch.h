@@ -32,6 +32,7 @@ public:
 	bool isRAMWRT(void) { return(ramwrt); }
 	bool useBank2(void) { return(bBank2); }
 	bool isALTZP(void) { return(altzp); }
+	bool isAltCharset(void) { return(altCharset); }
 	bool is80Store(void) { return(text80Store); }
 	bool is80Col(void) { return(text80Col); }
 	bool isPage2(void) { return(page2); }
