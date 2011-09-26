@@ -2190,8 +2190,8 @@ Machine::get_indirect_zeropage(uint8_t zp_offset)
 void
 Machine::do_adc(uint8_t val)
 {
-	int16_t result;
-	uint16_t uresult;
+	uint16_t result;
+	int16_t sResult;
 
 	// printf("ADC(%02X,%02X,%02X)\n", val, registers.a, registers.psw.f.c);
 
@@ -2202,21 +2202,54 @@ Machine::do_adc(uint8_t val)
 		registers.psw.f.c = (result > 99);
 	} else {
 		// Binary mode
-		result = (int8_t) registers.a + (int8_t) val + registers.psw.f.c;
-		uresult = registers.a + val + registers.psw.f.c;
-		registers.a = (uresult & 0x00FF);
-		registers.psw.f.c = (uresult > 0xFF);
+		sResult = (int8_t) registers.a + (int8_t) val + registers.psw.f.c;
+		result = registers.a + val + registers.psw.f.c;
+		registers.a = (result & 0x00FF);
+		registers.psw.f.c = (result > 0xFF);
 	}
 
 	// One reference says "result == 0", but I think it would
 	// makes more sense if "A == 0", since for other operations is
 	// essentially checks if <reg> is zero.
-	//registers.psw.f.v = a != b; //(result < -128 || result > 127);
-	registers.psw.f.v = (result < -128 || result > 127);
-	registers.psw.f.z = (uresult == 0);
+	registers.psw.f.v = (sResult < -128 || sResult > 127);
+	registers.psw.f.z = (result == 0);
 	registers.psw.f.n = ((registers.a & 0x80) != 0);
 
 	// printf("Result: $%04X (%d)  A: $%02X  V:%d  C:%d  N:%d\n", result, result, registers.a, registers.psw.f.v, registers.psw.f.c, registers.psw.f.n);
+}
+
+/*
+ * SBC (SuBstract with Carry)
+ * When the carry is clear, SBC NUM performs the calculation A = A - NUM - 1
+ * When the carry is set, SBC NUM performs the calculation A = A - NUM
+*/
+void
+Machine::do_sbc(uint8_t val)
+{
+	uint16_t result;
+
+	// printf("SBC(%02X,%02X,%02X)\n", registers.a, val, registers.psw.f.c);
+
+	if (registers.psw.f.d) {
+		// BCD mode
+		result = from_bcd(registers.a) - from_bcd(val) - (! registers.psw.f.c);
+		registers.a = to_bcd(result & 0x00FF);
+	} else {
+		// Binary mode.
+		result = registers.a - val - (! registers.psw.f.c);
+		registers.a = result & 0x00FF;
+	}
+
+	int16_t sResult = (int16_t) result;
+
+	// XXX: There is something wrong: SBC(A:0x01,VAL:#$D0,C:1)
+	// returns C:1 when it should be C:0
+	registers.psw.f.c = (sResult >= 0);
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
+	registers.psw.f.v = (sResult < -128 || sResult > 127);
+	registers.psw.f.z = (result == 0);
+
+	//printf("Result: %d  uresult: $%04X   c:%d  n:%d  v:%d  z:%dn", sResult, result, registers.psw.f.c, registers.psw.f.n, registers.psw.f.v, registers.psw.f.z);
 }
 
 void
@@ -2738,39 +2771,6 @@ Machine::do_rts(void)
 	uint8_t high = pop_stack();
 	
 	registers.pc = make16(high, low) + 1;
-}
-
-/*
- * SBC (SuBstract with Carry)
- * When the carry is clear, SBC NUM performs the calculation A = A - NUM - 1
- * When the carry is set, SBC NUM performs the calculation A = A - NUM
-*/
-void
-Machine::do_sbc(uint8_t val)
-{
-	uint16_t result;
-
-	// printf("SBC(%02X,%02X,%02X)\n", registers.a, val, registers.psw.f.c);
-
-	if (registers.psw.f.d) {
-		// BCD mode
-		result = from_bcd(registers.a) - from_bcd(val) - (! registers.psw.f.c);
-		registers.a = to_bcd(result & 0x00FF);
-	} else {
-		// Binary mode.
-		result = registers.a - val - (! registers.psw.f.c);
-		registers.a = result & 0x00FF;
-	}
-
-	int16_t sResult = (int16_t) result;
-
-	// XXX: There is something wrong: SBC(A:0x01,VAL:#$D0,C:1) returns C:1 when it should be C:0
-	registers.psw.f.c = (sResult >= 0);
-	registers.psw.f.n = ((registers.a & 0x80) != 0);
-	registers.psw.f.v = (sResult < -128 || sResult > 127);
-	registers.psw.f.z = (result == 0);
-
-	//printf("Result: %d  uresult: $%04X   c:%d  n:%d  v:%d  z:%dn", sResult, result, registers.psw.f.c, registers.psw.f.n, registers.psw.f.v, registers.psw.f.z);
 }
 
 void
