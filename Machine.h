@@ -171,5 +171,7 @@ protected:
 	Screen *screen;
 	bool pcBreakpointEnabled;
 	uint16_t pcBreakpointOffset;
+
+	bool traceInstructions;
 };
 

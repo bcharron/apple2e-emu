@@ -13,6 +13,35 @@
 
 using namespace std;
 
+#define SBC_TEST_TABLE_LEN sizeof(SBC_TEST_TABLE)
+uint8_t SBC_TEST_TABLE[] = {
+	0xD8, 0xA9, 0x01, 0x8D, 0x80, 0x03, 0xA9, 0x80,
+	0x8D, 0x81, 0x03, 0x8D, 0x82, 0x03, 0xA9, 0x00,
+	0x8D, 0x83, 0x03, 0x8D, 0x84, 0x03, 0xA0, 0x01,
+	0x20, 0x40, 0x03, 0xE0, 0x01, 0xF0, 0x20, 0x20,
+	0x90, 0x03, 0xE0, 0x01, 0xF0, 0x19, 0xEE, 0x81,
+	0x03, 0xEE, 0x83, 0x03, 0xD0, 0xEA, 0xEE, 0x82,
+	0x03, 0xEE, 0x84, 0x03, 0xD0, 0xE2, 0x88, 0x10,
+	0xDF, 0xA9, 0x00, 0x8D, 0x80, 0x03, 0x60, 0x60,
+	0xC0, 0x01, 0xAD, 0x81, 0x03, 0x6D, 0x82, 0x03,
+	0xA2, 0x00, 0x50, 0x01, 0xE8, 0xC0, 0x01, 0xAD,
+	0x83, 0x03, 0x6D, 0x84, 0x03, 0xB0, 0x04, 0x30,
+	0x01, 0xE8, 0x60, 0x10, 0x01, 0xE8, 0x60, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+	0x02, 0x03, 0x00, 0x04, 0x05, 0x06, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x07, 0x08, 0x00, 0x00,
+	0xA2, 0x00, 0x50, 0x01, 0xE8, 0xC0, 0x01, 0xAD,
+	0x83, 0x03, 0x6D, 0x84, 0x03, 0xB0, 0x04, 0x30,
+	0x01, 0xE8, 0x60, 0x10, 0x01, 0xE8, 0x60,
+	0xC0, 0x01, 0xAD, 0x81, 0x03, 0xED, 0x82, 0x03,
+	0xA2, 0x00, 0x50, 0x01, 0xE8, 0xC0, 0x01, 0xAD,
+	0x83, 0x03, 0xED, 0x84, 0x03, 0x48, 0xA9, 0xFF,
+	0xE9, 0x00, 0xC9, 0xFE, 0xD0, 0x05, 0x68, 0x30,
+	0x01, 0xE8, 0x60, 0x68, 0x90, 0xFB, 0x10, 0x01,
+	0xE8, 0x60,
+};
+
 /*
  *   Utility functions
  */
@@ -70,7 +99,8 @@ uint8_t to_bcd(uint8_t val)
 Machine::Machine()
 	: cycles(0),
 	  pcBreakpointEnabled(false),
-	  pcBreakpointOffset(0x0000)
+	  pcBreakpointOffset(0x0000),
+	  traceInstructions(false)
 {
 
 }
@@ -285,11 +315,6 @@ unsigned int getInstructionLen(uint8_t opcode)
 {
 	instruction_t *instr;
 	
-        if (opcode >= INSTR_TABLE_LEN) {
-                cerr << "Error: Opcode 0x" << hex << opcode << " is outside the instruction table" << endl;
-                return(0);
-        }
-
 	instr = &instr_table[opcode];
 
 	unsigned int len = instr->len;
@@ -307,11 +332,6 @@ Machine::dumpInstruction(uint16_t offset)
 	int bufsize = sizeof(strbuf) - 1;
 
 	opcode = memory->read(offset);
-
-        if (opcode >= INSTR_TABLE_LEN) {
-                cerr << "Error: Opcode 0x" << hex << opcode << " is outside the instruction table" << endl;
-                return(0);
-        }
 
 	instr = &instr_table[opcode];
 
@@ -390,8 +410,6 @@ Machine::executeNextInstruction(void)
 
 	opcode = memory->read(registers.pc++);
 
-	assert(opcode < INSTR_TABLE_LEN);
-
 	instr = &instr_table[opcode];
 
 	switch(instr->len)
@@ -456,8 +474,8 @@ Machine::executeNextInstruction(void)
 
 		case 0x06:
 		{
-			uint8_t val = memory->read(operands[0]);
-			do_asl_m(val);
+			uint16_t offset = operands[0];
+			do_asl_m(offset);
 			break;
 		}
 
@@ -2173,6 +2191,9 @@ void
 Machine::do_adc(uint8_t val)
 {
 	int16_t result;
+	uint16_t uresult;
+
+	// printf("ADC(%02X,%02X,%02X)\n", val, registers.a, registers.psw.f.c);
 
 	if (registers.psw.f.d) {
 		// BCD mode
@@ -2181,17 +2202,21 @@ Machine::do_adc(uint8_t val)
 		registers.psw.f.c = (result > 99);
 	} else {
 		// Binary mode
-		result = registers.a + val + registers.psw.f.c;
-		registers.a = (result & 0x00FF);
-		registers.psw.f.c = (result > 0xFF);
+		result = (int8_t) registers.a + (int8_t) val + registers.psw.f.c;
+		uresult = registers.a + val + registers.psw.f.c;
+		registers.a = (uresult & 0x00FF);
+		registers.psw.f.c = (uresult > 0xFF);
 	}
 
 	// One reference says "result == 0", but I think it would
 	// makes more sense if "A == 0", since for other operations is
 	// essentially checks if <reg> is zero.
+	//registers.psw.f.v = a != b; //(result < -128 || result > 127);
 	registers.psw.f.v = (result < -128 || result > 127);
-	registers.psw.f.z = (result == 0);
+	registers.psw.f.z = (uresult == 0);
 	registers.psw.f.n = ((registers.a & 0x80) != 0);
+
+	// printf("Result: $%04X (%d)  A: $%02X  V:%d  C:%d  N:%d\n", result, result, registers.a, registers.psw.f.v, registers.psw.f.c, registers.psw.f.n);
 }
 
 void
@@ -2222,6 +2247,8 @@ Machine::do_asl_m(uint16_t offset)
 	registers.psw.f.c = ((val & 0x80) > 0);
 
 	val = val << 1;
+
+	memory->write(offset, val);
 
 	registers.psw.f.z = (val == 0);
 	registers.psw.f.n = ((val & 0x80) > 0);
@@ -2265,10 +2292,15 @@ Machine::do_beq(int8_t rel)
 void
 Machine::do_bit(uint8_t val)
 {	
-	val = val & registers.a;
-
+	// Depending on the reference, V and N are either applied on
+	// the memory value or the AND'd value. The BASIC "BIT $11"
+	// test at $DAEE leads me to think they come directly from the
+	// memory value.
 	registers.psw.f.v = ((val & 0x40) != 0);
 	registers.psw.f.n = ((val & 0x80) != 0);
+
+	val = val & registers.a;
+
 	registers.psw.f.z = (val == 0);
 }
 
@@ -2309,8 +2341,8 @@ Machine::do_brk(void)
 	uint8_t low = get_low(registers.pc);
 	uint8_t high = get_high(registers.pc);
 	
-	push_stack(low);
 	push_stack(high);
+	push_stack(low);
 
 	// BRK flag is only set on the stack.
 	spc_flags_t flags;
@@ -2656,6 +2688,8 @@ void
 Machine::do_pla(void)
 {
 	registers.a = pop_stack();
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
+	registers.psw.f.z = (registers.a == 0);
 }
 
 void
@@ -2667,13 +2701,23 @@ Machine::do_plp(void)
 void
 Machine::do_plx(void)
 {
+	// Not a 6502 instruction
 	registers.x = pop_stack();
+
+	// XXX: possibly supposed to check reg A
+	registers.psw.f.n = ((registers.x & 0x80) != 0);
+	registers.psw.f.z = (registers.x == 0);
 }
 
 void
 Machine::do_ply(void)
 {
+	// Not a 6502 instruction
 	registers.y = pop_stack();
+
+	// XXX: possibly supposed to check reg A
+	registers.psw.f.n = ((registers.y & 0x80) != 0);
+	registers.psw.f.z = (registers.y == 0);
 }
 
 void
@@ -2704,22 +2748,29 @@ Machine::do_rts(void)
 void
 Machine::do_sbc(uint8_t val)
 {
-	int16_t result;
+	uint16_t result;
+
+	// printf("SBC(%02X,%02X,%02X)\n", registers.a, val, registers.psw.f.c);
 
 	if (registers.psw.f.d) {
 		// BCD mode
 		result = from_bcd(registers.a) - from_bcd(val) - (! registers.psw.f.c);
 		registers.a = to_bcd(result & 0x00FF);
 	} else {
-		// Binary mode
+		// Binary mode.
 		result = registers.a - val - (! registers.psw.f.c);
 		registers.a = result & 0x00FF;
 	}
 
-	registers.psw.f.c = (result >= 0);
+	int16_t sResult = (int16_t) result;
+
+	// XXX: There is something wrong: SBC(A:0x01,VAL:#$D0,C:1) returns C:1 when it should be C:0
+	registers.psw.f.c = (sResult >= 0);
 	registers.psw.f.n = ((registers.a & 0x80) != 0);
-	registers.psw.f.v = (result < -128 || result > 127);
+	registers.psw.f.v = (sResult < -128 || sResult > 127);
 	registers.psw.f.z = (result == 0);
+
+	//printf("Result: %d  uresult: $%04X   c:%d  n:%d  v:%d  z:%dn", sResult, result, registers.psw.f.c, registers.psw.f.n, registers.psw.f.v, registers.psw.f.z);
 }
 
 void
@@ -2858,6 +2909,20 @@ Machine::testCPU(void)
 {
 	printf("Starting CPU test..\n");
 
+	uint16_t offset = 0x300;
+/*
+	for(unsigned int x = 0; x < SBC_TEST_TABLE_LEN; x++) {
+		memory->write(offset + x, SBC_TEST_TABLE[x]);
+	}
+
+	setPC(0x300);
+	interactive();
+
+	uint8_t val = memory->read(0x380);
+	printf("SBC Test result: %02X\n", val);
+
+	assert(val == 0x00);
+*/
 	/* Test BCD routines */
 	uint8_t bcd_result = from_bcd(0x45) + from_bcd(0x05);
 	assert(bcd_result == 50);
@@ -2877,7 +2942,7 @@ Machine::testCPU(void)
 	bcd_result = to_bcd(1);
 	assert(bcd_result == 0x01);
 
-	uint16_t offset = 0x0000;
+	offset = 0x0000;
 	setPC(offset);
 
 	dumpRegisters();
@@ -2996,7 +3061,7 @@ Machine::testCPU(void)
 	dumpInstruction(registers.pc);
 	executeNextInstruction();
 	dumpRegisters();
-	assert(registers.a == 0x00 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 1 && registers.psw.f.n == 0);
+	assert(registers.a == 0x00 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 0);
 
 	/* ADC overflow */
 	memory->write(offset++, 0x18); // CLC
@@ -3011,7 +3076,22 @@ Machine::testCPU(void)
 	dumpInstruction(registers.pc);
 	executeNextInstruction();
 	dumpRegisters();
-	assert(registers.a == 0x8F && registers.psw.f.c == 0 && registers.psw.f.z == 0 && registers.psw.f.v == 1 && registers.psw.f.n == 1);
+	assert(registers.a == 0x8F && registers.psw.f.c == 0 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 1);
+
+	/* ADC overflow */
+	memory->write(offset++, 0x18); // CLC
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0xA9); // LDA #$F0
+	memory->write(offset++, 0xF0);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	memory->write(offset++, 0x69); // ADC #$F0
+	memory->write(offset++, 0xF0);
+	dumpInstruction(registers.pc);
+	executeNextInstruction();
+	dumpRegisters();
+	assert(registers.a == 0xE0 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 1);
 
 	/* SBC with carry */
 	memory->write(offset++, 0x38); // SEC
@@ -3142,8 +3222,14 @@ Machine::run(void)
 
 	while(! quit) {
 		if (pcBreakpointEnabled && getPC() == pcBreakpointOffset) {
-			// Eww. Not clean..
+			printf("Breakpoint on PC($%04X)\n", pcBreakpointOffset);
+			pcBreakpointEnabled = false;
+			// Eww. This return is not clean..
 			return;
+		}
+
+		if (traceInstructions) {
+			dumpInstruction(getPC());
 		}
 
 		executeNextInstruction();
@@ -3154,40 +3240,41 @@ Machine::run(void)
 			cycles = 0;
 		}
 					
-		int nbEvents = SDL_PollEvent(&event);
-
-		if (nbEvents > 0) {
-			// printf("Found %d events waiting.\n", nbEvents);
-
-			switch( event.type ){
-				/* Keyboard event */
-				case SDL_KEYDOWN:
-				{
-					printf("Key event! %c (0x%02X)\n", event.key.keysym.unicode, event.key.keysym.unicode);
-					MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
-					switches->setKeyboardData(event.key.keysym.unicode & 0x00FF);
-					switches->doKeyboardStrobe();
-					break;
-				}
-
-				/* SDL_QUIT event (window close) */
-				case SDL_QUIT:
-					quit = true;
-					break;
-
-				default:
-					break;
-			}
-		} else if (nbEvents < 0) {
-			fprintf(stderr, "SDL_PollEvents(): %s\n", SDL_GetError());
-			exit(1);
-		}
-
-		// Sleeping about ~100us every
-		// 100 cycles is easier on the
-		// CPU than sleeping 977ns
-		// every cycle.
+		// Sleeping about ~100us every 100 cycles is easier on
+		// the CPU than sleeping 977ns every cycle. Same goes
+		// for the event polling
 		if (cycles % 100 == 0) {
+			int nbEvents = SDL_PollEvent(&event);
+
+			if (nbEvents > 0) {
+				// printf("Found %d events waiting.\n", nbEvents);
+				
+				switch( event.type ){
+					/* Keyboard event */
+					case SDL_KEYDOWN:
+					{
+						if (event.key.keysym.unicode > 0) {
+							printf("Key event! %c (0x%02X)\n", event.key.keysym.unicode, event.key.keysym.unicode);
+							MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
+							switches->setKeyboardData(event.key.keysym.unicode & 0x00FF);
+							switches->doKeyboardStrobe();
+						}
+						break;
+					}
+					
+					/* SDL_QUIT event (window close) */
+					case SDL_QUIT:
+						quit = true;
+						break;
+						
+					default:
+						break;
+				}
+			} else if (nbEvents < 0) {
+				fprintf(stderr, "SDL_PollEvents(): %s\n", SDL_GetError());
+				exit(1);
+			}
+					       
 			nanosleep(&ts, NULL);
 		}
 	}
@@ -3213,6 +3300,7 @@ enum command_values {
 	CMD_SHOW_REGS,
 	CMD_SHOW_STACK,
 	CMD_STEP,
+	CMD_TRACE,
 	CMD_WRITE,
 	CMD_UNKNOWN
 };
@@ -3239,6 +3327,7 @@ struct command_struct COMMAND_TABLE[] =
 	{ "run",    CMD_RUN },
 	{ "sr",     CMD_SHOW_REGS },
 	{ "ss",     CMD_SHOW_STACK },
+	{ "trace",  CMD_TRACE },
 	{ "x",      CMD_STEP },
 	{ "w",      CMD_WRITE },
 };
@@ -3298,6 +3387,7 @@ Machine::interactive(void)
 				printf("ret            Return from JSR\n");
 				printf("sr             Show Registers\n");
 				printf("ss             Show Stack\n");
+				printf("trace          Trace instructions when running\n");
 				printf("x              Step over\n");
 				printf("w $addr $byte  Write $byte at $addr (ie, POKE)\n");
 				printf("<enter>        Execute next instruction\n");
@@ -3394,12 +3484,6 @@ Machine::interactive(void)
 				break;
 			}
 
-			case CMD_REDRAW:
-			{
-				screen->redraw();
-				break;
-			}
-
 			case CMD_SHOW_STACK:
 			{
 				dumpStack(8);
@@ -3418,16 +3502,50 @@ Machine::interactive(void)
 				break;
 			}
 
+			case CMD_REDRAW:
+			{
+				screen->redraw();
+				break;
+			}
+
+			case CMD_RET:
+			{
+				uint16_t offset = OFFSET_PAGE_1 | (registers.sp + 1);
+				uint8_t low = memory->read(offset);
+				uint8_t high = memory->read(offset + 1);
+				
+				offset = make16(high, low) + 1;
+				
+				printf("Executing until PC == %04X\n", offset);
+				setPCBreakpoint(offset);
+				run();
+				
+				break;
+			}
+
+			case CMD_RUN:
+			{
+				run();
+				break;
+			}
+
 			case CMD_STEP:
 			{
 				unsigned int len = getInstructionLen(memory->read(getPC()));
 				uint16_t next = getPC() + len;
 
 				printf("Executing until PC == %04X\n", next);
-				while (getPC() != next) {
-					executeNextInstruction();
-				}
+				setPCBreakpoint(next);
+				run();
 
+				break;
+			}
+
+			case CMD_TRACE:
+			{
+				traceInstructions = ! traceInstructions;
+
+				printf("Instruction tracing is now %s\n", traceInstructions ? "ON" : "OFF");
 				break;
 			}
 
@@ -3448,29 +3566,6 @@ Machine::interactive(void)
 				break;
 			}
 			
-			case CMD_RET:
-			{
-				registers.sp++;
-
-				uint16_t offset = OFFSET_PAGE_1 | (registers.sp + 1);
-				uint8_t low = memory->read(offset);
-				uint8_t high = memory->read(offset + 1);
-				
-				offset = make16(high, low) + 1;
-
-				// There should be an Interactive::run() instead of it being in the switch()
-				while (getPC() != offset)
-					executeNextInstruction();
-				
-				break;
-			}
-
-			case CMD_RUN:
-			{
-				run();
-				break;
-			}
-
 			default:
 			{
 				cout << "Unknown command" << endl;

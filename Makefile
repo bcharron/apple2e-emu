@@ -1,5 +1,4 @@
-LDFLAGS=-lSDL
-CFLAGS=-Wall -ggdb
+LDFLAGS=`/opt/local/bin/sdl-config --libs` -lSDL
 CPPFLAGS=-Wall -ggdb
 CC=g++
 
