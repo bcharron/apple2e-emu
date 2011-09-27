@@ -2212,7 +2212,7 @@ Machine::do_adc(uint8_t val)
 	// makes more sense if "A == 0", since for other operations is
 	// essentially checks if <reg> is zero.
 	registers.psw.f.v = (sResult < -128 || sResult > 127);
-	registers.psw.f.z = (result == 0);
+	registers.psw.f.z = (registers.a == 0);  // 65C02 mode. In 6502, 'result' is tested.
 	registers.psw.f.n = ((registers.a & 0x80) != 0);
 
 	// printf("Result: $%04X (%d)  A: $%02X  V:%d  C:%d  N:%d\n", result, result, registers.a, registers.psw.f.v, registers.psw.f.c, registers.psw.f.n);
@@ -2222,11 +2222,16 @@ Machine::do_adc(uint8_t val)
  * SBC (SuBstract with Carry)
  * When the carry is clear, SBC NUM performs the calculation A = A - NUM - 1
  * When the carry is set, SBC NUM performs the calculation A = A - NUM
+ * 
+ * Result:
+ * V flag is set if the [signed] result is outside the -128..127 range
+ * C flag is clear if the [unsigned] operation had to borrow
 */
 void
 Machine::do_sbc(uint8_t val)
 {
 	uint16_t result;
+	int16_t sResult;
 
 	// printf("SBC(%02X,%02X,%02X)\n", registers.a, val, registers.psw.f.c);
 
@@ -2237,17 +2242,19 @@ Machine::do_sbc(uint8_t val)
 	} else {
 		// Binary mode.
 		result = registers.a - val - (! registers.psw.f.c);
+		sResult = (int8_t) registers.a - (int8_t) val - (! registers.psw.f.c);
 		registers.a = result & 0x00FF;
 	}
 
-	int16_t sResult = (int16_t) result;
+	// int16_t sResult = (int16_t) result;
 
 	// XXX: There is something wrong: SBC(A:0x01,VAL:#$D0,C:1)
 	// returns C:1 when it should be C:0
-	registers.psw.f.c = (sResult >= 0);
+	//registers.psw.f.c = (sResult >= 0);
+	registers.psw.f.c = !(result > 0xFF);
 	registers.psw.f.n = ((registers.a & 0x80) != 0);
 	registers.psw.f.v = (sResult < -128 || sResult > 127);
-	registers.psw.f.z = (result == 0);
+	registers.psw.f.z = (registers.a == 0); // 65C02 mode. In 6502, 'result' is tested.
 
 	//printf("Result: %d  uresult: $%04X   c:%d  n:%d  v:%d  z:%dn", sResult, result, registers.psw.f.c, registers.psw.f.n, registers.psw.f.v, registers.psw.f.z);
 }
@@ -2584,81 +2591,6 @@ Machine::do_ldy(uint8_t val)
 	registers.psw.f.n = ((registers.y & 0x80) != 0);
 }
 
-void
-Machine::do_ora(uint8_t val)
-{
-	registers.a |= val;
-	registers.psw.f.z = (registers.a == 0);
-	registers.psw.f.n = ((registers.a & 0x80) != 0);
-}
-
-uint8_t
-Machine::rotate_left(uint8_t val)
-{
-	uint8_t new_carry = (val & 0x80);
-
-	val = (val << 1) | registers.psw.f.c;
-
-	registers.psw.f.c = (new_carry != 0);
-	registers.psw.f.n = ((val & 0x80) != 0);
-	registers.psw.f.z = (val == 0);
-
-	return(val);
-}
-
-uint8_t
-Machine::rotate_right(uint8_t val)
-{
-	uint8_t temp_carry = (val & 0x01);
-
-	val = (val >> 1);
-
-	registers.psw.f.n = registers.psw.f.c;
-
-	if (registers.psw.f.c)
-		val |= 0x80;
-
-	registers.psw.f.c = temp_carry;
-
-	return(val);
-}
-
-void
-Machine::do_ror_a(void)
-{
-	registers.a = rotate_right(registers.a);
-	
-	registers.psw.f.z = (registers.a == 0);
-}
-
-void
-Machine::do_ror_m(uint16_t offset)
-{
-	uint8_t val = memory->read(offset);
-
-	val = rotate_right(val);
-
-	registers.psw.f.z = (val == 0);
-
-	memory->write(offset, val);
-}
-
-void
-Machine::do_rol_a(void)
-{
-	registers.a = rotate_left(registers.a);
-}
-
-void
-Machine::do_rol_m(uint16_t offset)
-{
-	uint8_t val = memory->read(offset);
-
-	val = rotate_left(val);
-
-	memory->write(offset, val);
-}
-
 uint8_t
 Machine::shift_right(uint8_t val)
 {
@@ -2686,6 +2618,14 @@ Machine::do_lsr_m(uint16_t offset)
 	val = shift_right(val);
 
 	memory->write(offset, val);
+}
+
+void
+Machine::do_ora(uint8_t val)
+{
+	registers.a |= val;
+	registers.psw.f.z = (registers.a == 0);
+	registers.psw.f.n = ((registers.a & 0x80) != 0);
 }
 
 void
@@ -2753,6 +2693,70 @@ Machine::do_ply(void)
 	registers.psw.f.z = (registers.y == 0);
 }
 
+uint8_t
+Machine::rotate_left(uint8_t val)
+{
+	uint8_t new_carry = ((val & 0x80) != 0);
+
+	val = (val << 1) | registers.psw.f.c;
+
+	registers.psw.f.c = new_carry;
+	registers.psw.f.n = ((val & 0x80) != 0);
+	registers.psw.f.z = (val == 0);
+
+	return(val);
+}
+
+void
+Machine::do_rol_a(void)
+{
+	registers.a = rotate_left(registers.a);
+}
+
+void
+Machine::do_rol_m(uint16_t offset)
+{
+	uint8_t val = memory->read(offset);
+
+	val = rotate_left(val);
+
+	memory->write(offset, val);
+}
+
+uint8_t
+Machine::rotate_right(uint8_t val)
+{
+	uint8_t temp_carry = (val & 0x01);
+
+	val = (val >> 1);
+
+	registers.psw.f.n = registers.psw.f.c;
+
+	if (registers.psw.f.c)
+		val |= 0x80;
+
+	registers.psw.f.c = temp_carry;
+	registers.psw.f.z = (val == 0);
+
+	return(val);
+}
+
+void
+Machine::do_ror_a(void)
+{
+	registers.a = rotate_right(registers.a);
+}
+
+void
+Machine::do_ror_m(uint16_t offset)
+{
+	uint8_t val = memory->read(offset);
+
+	val = rotate_right(val);
+
+	memory->write(offset, val);
+}
+
 void
 Machine::do_rti(void)
 {
@@ -2782,7 +2786,7 @@ Machine::do_sec(void)
 void
 Machine::do_sed(void)
 {
-	printf("Warning: code enabled unimplemented BCD-mode\n");
+	printf("Warning: BCD-mode enabled. This may or not work.\n");
 	registers.psw.f.d = 1;
 }
 
@@ -2817,19 +2821,19 @@ Machine::do_stz(uint16_t offset)
 }
 
 void
-Machine::do_tay(void)
-{
-	registers.y = registers.a;
-	registers.psw.f.n = ((registers.y & 0x80) != 0);
-	registers.psw.f.z = (registers.y == 0);
-}
-
-void
 Machine::do_tax(void)
 {
 	registers.x = registers.a;
 	registers.psw.f.n = ((registers.x & 0x80) != 0);
 	registers.psw.f.z = (registers.x == 0);
+}
+
+void
+Machine::do_tay(void)
+{
+	registers.y = registers.a;
+	registers.psw.f.n = ((registers.y & 0x80) != 0);
+	registers.psw.f.z = (registers.y == 0);
 }
 
 void
@@ -2923,6 +2927,97 @@ Machine::testCPU(void)
 
 	assert(val == 0x00);
 */
+
+	/* Test ADC */
+	registers.a = 0x00;
+	registers.psw.f.c = 0;
+	do_adc(0xFF);
+	assert(registers.psw.f.v == 0 && registers.psw.f.c == 0);
+
+	registers.a = -10;
+	registers.psw.f.c = 0;
+	do_adc(-117);
+	assert(registers.psw.f.v == 0 && registers.psw.f.c == 1);
+
+	registers.a = -20;
+	registers.psw.f.c = 0;
+	do_adc(-117);
+	assert(registers.psw.f.v == 1 && registers.psw.f.c == 1);
+
+	registers.a = 100;
+	registers.psw.f.c = 0;
+	do_adc(27);
+	assert(registers.psw.f.v == 0 && registers.psw.f.c == 0);
+
+	registers.a = 100;
+	registers.psw.f.c = 0;
+	do_adc(100);
+	assert(registers.psw.f.v == 1 && registers.psw.f.c == 0);
+
+	registers.a = 255;
+	registers.psw.f.c = 0;
+	do_adc(255);
+	dumpRegisters();
+	assert(registers.psw.f.v == 0 && registers.psw.f.c == 1);
+
+	registers.psw.f.d = 0;
+
+	for(int carry = 0; carry <= 1; carry++) {
+		for(short int x = -128; x < 127; x++) {
+			for (short int y = 127; y >= -128; y--) {
+				registers.a = x;
+				registers.psw.f.c = carry;
+				do_adc(y);
+
+				short int result = x + y + carry;
+				short unsigned int uresult = (uint8_t) x + (uint8_t) y + carry;
+
+				int vflag;
+				int cflag;
+				if (result > 127 || result < -128)
+					vflag = 1;
+				else
+					vflag = 0;
+
+				if (uresult > 255)
+					cflag = 1;
+				else
+					cflag = 0;
+
+				assert(vflag == registers.psw.f.v);
+
+				if (cflag != registers.psw.f.c)
+					printf("%d + %d = %d (%04X). c should be %d but is %d\n", x, y, result, uresult, cflag, registers.psw.f.c);
+
+				assert(cflag == registers.psw.f.c);
+
+				registers.a = x;
+				registers.psw.f.c = carry;
+				do_sbc(y);
+
+				result = x - y - !carry;
+				uresult = (uint8_t) x - (uint8_t) y - !carry;
+				if (result > 127 || result < -128)
+					vflag = 1;
+				else
+					vflag = 0;
+
+				//if (x > (y + !carry))
+				if (! (uresult > 255) )
+					cflag = 1;
+				else
+					cflag = 0;
+
+				assert(vflag == registers.psw.f.v);
+				
+				if (cflag != registers.psw.f.c)
+					printf("%d - %d - %d = %d (%u). c should be %d but is %d\n", x, y, ! carry, result, uresult, cflag, registers.psw.f.c);
+
+				assert(cflag == registers.psw.f.c);
+			}
+		}
+	}
+
 	/* Test BCD routines */
 	uint8_t bcd_result = from_bcd(0x45) + from_bcd(0x05);
 	assert(bcd_result == 50);
@@ -3061,7 +3156,10 @@ Machine::testCPU(void)
 	dumpInstruction(registers.pc);
 	executeNextInstruction();
 	dumpRegisters();
-	assert(registers.a == 0x00 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 0);
+	// On a 6502:
+	// assert(registers.a == 0x00 && registers.psw.f.c == 1 && registers.psw.f.z == 0 && registers.psw.f.v == 0 && registers.psw.f.n == 0);
+	// On a 65C02:
+	assert(registers.a == 0x00 && registers.psw.f.c == 1 && registers.psw.f.z == 1 && registers.psw.f.v == 0 && registers.psw.f.n == 0);
 
 	/* ADC overflow */
 	memory->write(offset++, 0x18); // CLC
@@ -3510,6 +3608,9 @@ Machine::interactive(void)
 
 			case CMD_RET:
 			{
+				// Very flawed: assumes SP == PC, but
+				// it could be anything pushed on the
+				// stack
 				uint16_t offset = OFFSET_PAGE_1 | (registers.sp + 1);
 				uint8_t low = memory->read(offset);
 				uint8_t high = memory->read(offset + 1);
