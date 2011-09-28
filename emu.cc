@@ -48,8 +48,6 @@ int main (int argc, char *argv[])
 
 	machine.init();
 
-	printf("0x61: %c\n", 0x61);
-	
 	if (! machine.loadApple2eROM(romFilename)) {
 		cerr << "Could not load the apple ROM " << ROM_FILENAME << endl;
 		exit(1);
