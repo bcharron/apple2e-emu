@@ -25,6 +25,7 @@
 
 #include <string>
 
+#include "Registers.h"
 #include "Screen.h"
 
 #define APPLE2E_ROM_SIZE 32768
@@ -33,29 +34,6 @@
 #define BOOTSTRAP_ADDRESS 0xFA62
 #define MONITOR_START 0xFF69
 #define CYCLE_TIME .00000097751710654936f     // Seconds per cycle
-
-typedef union spc_flags_u {
-        struct {
-                unsigned int c : 1; // Carry
-                unsigned int z : 1; // Zero
-                unsigned int i : 1; // Interrupt Enable
-                unsigned int d : 1; // Binary Coded Decimal
-                unsigned int b : 1; // Break
-                unsigned int p : 1; // Reserved
-                unsigned int v : 1; // Overflow
-                unsigned int n : 1; // Negative
-        } f;
-        uint8_t val;
-} spc_flags_t;
-
-struct registers_s {
-	uint8_t a;
-	uint8_t x;
-	uint8_t y;
-	uint8_t sp;   // Stack pointer. Works in 0x0100 to 0x01FF (page 1)
-	spc_flags_t psw;
-	uint16_t pc;	
-};
 
 class Machine
 {
@@ -76,6 +54,8 @@ public:
 	void interactive(void);
 	void run(void);
 	void setPCBreakpoint(uint16_t offset);
+	bool isBranchTaken(uint8_t opcode);
+	bool isConditionalBranchInstruction(uint8_t opcode);
 
 	MemoryBus *memory;
 
@@ -166,7 +146,7 @@ protected:
 	uint16_t get_absolute_x(uint8_t operand0, uint8_t operand1);
 	uint16_t get_absolute_y(uint8_t operand0, uint8_t operand1);
 
-	struct registers_s registers;
+	registers_t registers;
 	unsigned long int cycles;
 	Screen *screen;
 	bool pcBreakpointEnabled;

@@ -108,7 +108,7 @@ Machine::Machine()
 bool
 Machine::init()
 {
-	memory = new MemoryBus(64 * 1024);
+	memory = new MemoryBus(64 * 1024, &registers);
 	memory->init();
 
 	registers.a = 0x00;
@@ -322,6 +322,111 @@ unsigned int getInstructionLen(uint8_t opcode)
 	return(len);
 }
 
+#define BRANCH_INSTRUCTIONS_TABLE_LEN sizeof(BRANCH_INSTRUCTIONS_TABLE)
+uint8_t BRANCH_INSTRUCTIONS_TABLE[] =
+{
+	0x10, // BPL rel
+	0x30, // BMI rel
+	0x50, // BVC rel
+	0x70, // BVS rel
+	0x80, // BRA rel
+	0x90, // BCC rel
+	0xB0, // BCS rel
+	0xD0, // BNE rel
+	0xF0, // BEQ rel
+};
+
+bool
+Machine::isConditionalBranchInstruction(uint8_t opcode)
+{
+	bool isBranch = false;
+
+	for (unsigned int x = 0; x < BRANCH_INSTRUCTIONS_TABLE_LEN; x++) {
+		if (BRANCH_INSTRUCTIONS_TABLE[x] == opcode) {
+			isBranch = true;
+			break;
+		}
+	}
+
+	return(isBranch);
+}
+
+/* 
+ * XXX: Every conditionnal branch instruction should probably use this
+ * function to minimize code duplication
+ */
+bool
+Machine::isBranchTaken(uint8_t opcode)
+{
+	bool taken;
+
+	switch(opcode)
+	{
+		case 0x10: // BPL
+		{
+			taken = ! registers.psw.f.n;
+			break;
+		}
+
+		case 0x30: // BMI
+		{
+			taken = registers.psw.f.n;
+			break;
+		}
+
+		case 0x50: // BVC
+		{
+			taken = ! registers.psw.f.v;
+			break;
+		}
+
+		
+		case 0x70: // BVS rel
+		{
+			taken = registers.psw.f.v;
+			break;
+		}
+
+		case 0x80: // BRA rel
+		{
+			taken = true;
+			break;
+		}
+
+		case 0x90: // BCC rel
+		{
+			taken = ! registers.psw.f.c;
+			break;
+		}
+
+		case 0xB0: // BCS rel
+		{
+			taken = registers.psw.f.c;
+			break;
+		}
+
+		case 0xD0: // BNE rel
+		{
+			taken = ! registers.psw.f.z;
+			break;
+		}
+
+		case 0xF0: // BEQ rel
+		{
+			taken = registers.psw.f.z;
+			break;
+		}
+
+		default:
+		{
+			taken = true;
+			break;
+		}
+	}
+
+	return(taken);
+}
+
 /* Returns number of bytes fetched for this instruction */
 unsigned int
 Machine::dumpInstruction(uint16_t offset)
@@ -378,23 +483,34 @@ Machine::dumpInstruction(uint16_t offset)
 	
 	printf("%s", strbuf);
 
-	if (isRelativeBranchInstruction(opcode)) {
-		uint16_t dest = offset + len + (int8_t) memory->read(offset + 1);
+	if (isBranchInstruction(opcode)) {
+		if (isRelativeBranchInstruction(opcode)) {
+			uint16_t dest = offset + len + (int8_t) memory->read(offset + 1);
 
-		printf("  ($%04X)", dest);
+			printf("  ($%04X)", dest);
+		}
+
+		// Show whether a branch will be taken or not
+		if (isConditionalBranchInstruction(opcode)) {
+			if (isBranchTaken(opcode)) {
+				printf(" [taken]");
+			} else
+				printf(" [not taken]");
+		}
+
+		if (opcode == 0x20 || opcode == 0x4C) { // JSR || JMP abs
+			uint8_t operand1 = memory->read(offset + 1);
+			uint8_t operand2 = memory->read(offset + 2);
+
+			uint16_t dest = make16(operand2, operand1);
+
+			std::string *subroutine = getSubroutineHandle(dest);
+
+			if (subroutine)
+				printf(" ; %s", subroutine->c_str());
+		}
 	}
 
-	if (opcode == 0x20 || opcode == 0x4C) { // JSR || JMP abs
-		uint8_t operand1 = memory->read(offset + 1);
-		uint8_t operand2 = memory->read(offset + 2);
-
-		uint16_t dest = make16(operand2, operand1);
-
-		std::string *subroutine = getSubroutineHandle(dest);
-
-		if (subroutine)
-			printf(" ; %s", subroutine->c_str());
-	}
 
 	printf("\n");
 

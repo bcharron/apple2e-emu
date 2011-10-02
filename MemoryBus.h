@@ -1,6 +1,8 @@
 #include <vector>
 #include <stdint.h>
+
 #include "MemoryRegion.h"
+#include "Registers.h"
 
 #define NB_REGIONS 8
 enum memory_regions {
@@ -20,7 +22,7 @@ enum memory_regions {
 class MemoryBus
 {
 public:
-	MemoryBus(unsigned int size);
+	MemoryBus(unsigned int size, registers_t *registers);
 	void init(void);
 	void addRegion(MemoryRegion *region);
 	void setRegionData(enum memory_regions regionNumber, uint16_t size, uint8_t *data);
@@ -35,4 +37,5 @@ public:
 protected:
 	unsigned int memorySize;
 	MemoryRegion *regions[NB_REGIONS];
+	registers_t *registers;
 };

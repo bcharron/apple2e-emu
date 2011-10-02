@@ -39,6 +39,8 @@ public:
 	virtual uint8_t read(uint16_t offset);
 	virtual void write(uint16_t offset, uint8_t val);
 	unsigned long getSize(void);
+	bool isReadOnly(void);
+
 protected:
 	uint16_t translateOffset(uint16_t offset);
 

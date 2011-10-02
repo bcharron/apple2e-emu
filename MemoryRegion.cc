@@ -39,6 +39,11 @@ unsigned long MemoryRegion::getSize(void)
 	return(this->size);
 }
 
+bool MemoryRegion::isReadOnly(void)
+{
+	return(readonly);
+}
+
 /* 
  * Translate from absolute offset (ie, offset in the entire memory) to
  * the offset for this memory region. ie, if the entire memory is 65k,

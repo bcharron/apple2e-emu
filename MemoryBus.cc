@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 
+#include "Registers.h"
 #include "MemorySoftSwitch.h"
 
 using namespace std;
@@ -21,8 +22,9 @@ uint8_t get_page(uint16_t addr)
 	return(page);
 }
 
-MemoryBus::MemoryBus(unsigned int size)
-	: memorySize(size)
+MemoryBus::MemoryBus(unsigned int size, registers_t *registers)
+	: memorySize(size),
+	  registers(registers)
 {
 }
 
@@ -70,6 +72,7 @@ MemoryBus::setRegionData(enum memory_regions regionNumber, uint16_t size, uint8_
 #define ACCESS_WRITE true
 #define ACCESS_READ false
 
+// XXX: Add memory breakpoints
 uint8_t
 MemoryBus::read(uint16_t offset)
 {
@@ -235,6 +238,11 @@ MemoryBus::access(uint16_t offset, bool write, uint8_t byte)
 	if (region) {
 		if (write) {
 			result = 0;
+
+			// XXX: It would be very useful here to have access to the registers.
+			if (region->isReadOnly())
+				printf("Warning: Code at $%04X is trying to write to readonly region $%04X\n", registers->pc, offset);
+
 			region->write(offset, byte);
 		} else
 			result = region->read(offset);
