@@ -1105,7 +1105,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x55:
 		{
-			uint16_t offset = memory->read(operands[0]) + registers.x;
+			uint16_t offset = (operands[0] + registers.x) % 0xFF;
 			uint8_t val = memory->read(offset);
 			do_eor(val);
 			break;
@@ -1113,7 +1113,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x56:
 		{
-			uint16_t offset = memory->read(operands[0]) + registers.x;
+			uint16_t offset = (operands[0] + registers.x) % 0xFF;
 			do_lsr_m(offset);
 			break;
 		}
@@ -1163,7 +1163,7 @@ Machine::executeNextInstruction(void)
 
 		case 0x5E:
 		{
-			uint16_t offset = get_absolute_y(operands[0], operands[1]);
+			uint16_t offset = get_absolute_x(operands[0], operands[1]);
 			do_lsr_m(offset);
 			break;
 		}
@@ -2060,7 +2060,7 @@ Machine::executeNextInstruction(void)
 		{
 			uint16_t offset = operands[0];
 			uint8_t val = memory->read(offset);
-			do_cmp(val);
+			do_cpx(val);
 			break;
 		}
 
