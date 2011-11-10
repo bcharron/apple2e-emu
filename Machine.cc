@@ -128,6 +128,8 @@ Machine::init()
 		fprintf(stderr, "WARNING: Running in text mode\n");
 	}
 
+	screen->setZoom(2);
+
 	return(true);
 }
 

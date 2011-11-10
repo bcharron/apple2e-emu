@@ -25,10 +25,16 @@
 
 #include <SDL/SDL.h>
 
+/*
+ *  XXX: I think the best way to handle switch changes
+ *  (text/gfx1/gfx2) would be a simple Observer.
+ */
+
 Screen::Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion, 
 	       MemoryRegion *auxRegion, MemorySoftSwitch *switches)
 	: width(width),
 	  height(height),
+	  zoomFactor(1),
 	  mainRegion(mainRegion),
 	  auxRegion(auxRegion),
 	  switches(switches),
@@ -37,12 +43,37 @@ Screen::Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion
 }
 
 /*
+ *  Change the pixel size, effectively 'zooming' it
+ */
+void
+Screen::setZoom(unsigned int zoomFactor)
+{
+	this->zoomFactor = zoomFactor;
+}
+
+unsigned int
+Screen::getZoom(void)
+{
+	return(this->zoomFactor);
+}
+
+/*
  * Set the pixel at (x, y) to the given value
  * NOTE: The surface must be locked before calling this!
+ * (Code taken from SDL examples)
  */
-void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
+void
+Screen::sdl_putpixel(unsigned int x, unsigned int y, Uint32 pixel)
 {
+	SDL_Surface *surface = sdl_screen;
+
 	int bpp = surface->format->BytesPerPixel;
+
+	if (x >= width || y >= height) {
+		printf("ERROR: Trying to draw past the screen! (%d,%d)\n", x, y);
+		return;
+	}
+
 	/* Here p is the address to the pixel we want to set */
 	Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
 
@@ -70,6 +101,21 @@ void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
 		case 4:
 			*(Uint32 *)p = pixel;
 			break;
+	}
+}
+
+/*
+ *  Draw a pixel on the screen, taking into account the zoom factor
+ */
+void
+Screen::putZoomPixel(unsigned int x, unsigned int y, Uint32 color)
+{
+	unsigned int zx, zy;
+
+	for (zx = 0; zx < zoomFactor; zx++) {
+		for (zy = 0; zy < zoomFactor; zy++) {
+			sdl_putpixel(x * zoomFactor + zx, y * zoomFactor + zy, color);
+		}
 	}
 }
 
@@ -212,7 +258,7 @@ Screen::drawCharacter(int x, int y, int charIndex)
 			uint8_t bit = fontBuffer[charIndex * 8 + scanline + charsetIndex] & c;
 
 			Uint32 pixel = ((bit != 0) ? white : black);
-			putpixel(sdl_screen, x + b, y + scanline, pixel);
+			putZoomPixel(x + b, y + scanline, pixel);
 		}
 	}
 

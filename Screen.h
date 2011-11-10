@@ -41,13 +41,18 @@ public:
 	void redraw(void);
 	void drawCharacter(int x, int y, int charIndex);
 	bool loadFont(std::string filename);
+	void setZoom(unsigned int zoomFactor);
+	unsigned int getZoom(void);
 
 private:
 	void redrawText(void);
 	void redrawGraphics(void);
+	void putZoomPixel(unsigned int x, unsigned int y, Uint32 color);
+	void sdl_putpixel(unsigned int x, unsigned int y, Uint32 color);
 
 	unsigned int width;
 	unsigned int height;
+	unsigned int zoomFactor;
 
 	MemoryRegion *mainRegion;
 	MemoryRegion *auxRegion;
