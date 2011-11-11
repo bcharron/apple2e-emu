@@ -32,6 +32,11 @@
 #include "MemorySoftSwitch.h"
 
 #define SCREEN_FONT_SIZE 4096
+#define CHARACTER_WIDTH  7
+#define CHARACTER_HEIGHT 8
+#define CHARACTER_COLS   40
+#define CHARACTER_ROWS   24
+#define CHARACTER_LINE_SIZE 0x80
 
 class Screen
 {
@@ -41,7 +46,7 @@ public:
 	void redraw(void);
 	void drawCharacter(int x, int y, int charIndex);
 	bool loadFont(std::string filename);
-	void setZoom(unsigned int zoomFactor);
+	bool setZoom(unsigned int zoomFactor);
 	unsigned int getZoom(void);
 
 private:

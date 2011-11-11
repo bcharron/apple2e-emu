@@ -45,10 +45,26 @@ Screen::Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion
 /*
  *  Change the pixel size, effectively 'zooming' it
  */
-void
+bool
 Screen::setZoom(unsigned int zoomFactor)
 {
+	SDL_Surface *newSurface;
+
 	this->zoomFactor = zoomFactor;
+
+	height = CHARACTER_HEIGHT * CHARACTER_ROWS * zoomFactor;
+	width = CHARACTER_WIDTH * CHARACTER_COLS * zoomFactor;
+
+	newSurface = SDL_SetVideoMode(width, height, 8, SDL_SWSURFACE);
+	if ( newSurface == NULL ) {
+		// XXX: Is the old surface still valid though???
+		fprintf(stderr, "Couldn't set %dx%dx8 video mode: %s\n", width, height, SDL_GetError());
+		return(false);
+	}
+
+	sdl_screen = newSurface;
+
+	return(true);
 }
 
 unsigned int
@@ -129,9 +145,9 @@ Screen::init(void)
 
 	atexit(SDL_Quit);
 
-	sdl_screen = SDL_SetVideoMode(640, 480, 8, SDL_SWSURFACE);
+	sdl_screen = SDL_SetVideoMode(width, height, 8, SDL_SWSURFACE);
 	if ( sdl_screen == NULL ) {
-		fprintf(stderr, "Couldn't set 640x480x8 video mode: %s\n", SDL_GetError());
+		fprintf(stderr, "Couldn't set %dx%dx8 video mode: %s\n", width, height, SDL_GetError());
 		return(false);
 	}
 
@@ -175,7 +191,10 @@ Screen::redrawText(void)
 			printf("\n");
 		}
 	} else {
-		// The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450
+		/* 
+		 *  The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450.
+		 *  Each line is 0x80 bytes size (ie: line 0 is at 0x400, line 1 at 0x480, etc.)
+		 */
 		ptr = 0x400;
 		for (int y = 0; y < 24; y++) {
 			for (int x = 0; x < 40; x++) {
@@ -186,11 +205,11 @@ Screen::redrawText(void)
 				else
 					ptr = 0x450;
 
-				uint16_t offset = ptr + ((y % 8) * 0x80) + x;
+				uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
 				uint8_t c = mainRegion->read(offset);
 
 				// printf("%c", c);
-				drawCharacter(x * 8, y * 8, c);
+				drawCharacter(x * CHARACTER_WIDTH, y * CHARACTER_HEIGHT, c);
 			}
 			//printf("\n");
 		}
@@ -236,6 +255,7 @@ void
 Screen::drawCharacter(int x, int y, int charIndex)
 {
 	Uint32 white = SDL_MapRGB(sdl_screen->format, 0xff, 0xff, 0xff);
+	// Uint32 white = SDL_MapRGB(sdl_screen->format, 15, 119, 30);
 	Uint32 black = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x00);
 
 	/* Lock the screen for direct access to the pixels */
@@ -252,8 +272,8 @@ Screen::drawCharacter(int x, int y, int charIndex)
 		charsetIndex = 2048;
 
 	/* Draw each scanline, one by one */
-	for (int scanline = 0; scanline < 8; scanline++) {
-		for (uint8_t b = 0; b < 8; b++) {
+	for (int scanline = 0; scanline < CHARACTER_HEIGHT; scanline++) {
+		for (uint8_t b = 0; b < CHARACTER_WIDTH; b++) {
 			uint8_t c = 0x01 << b;
 			uint8_t bit = fontBuffer[charIndex * 8 + scanline + charsetIndex] & c;
 
