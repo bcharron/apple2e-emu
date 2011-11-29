@@ -182,6 +182,7 @@ Screen::redrawText(void)
 	if (switches->is80Col()) {
 		ptr = 0x400;
 
+                /*
 		for (int y = 0; y < 24; y++) {
 			for (int x = 0; x < 40; x++) {
 				printf("%c", mainRegion->read(ptr + (y * 0x80) + x) & 0x7F);
@@ -189,6 +190,38 @@ Screen::redrawText(void)
 			}
 
 			printf("\n");
+		}
+                */
+
+		/* 
+		 *  The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450.
+		 *  Each line is 0x80 bytes size (ie: line 0 is at 0x400, line 1 at 0x480, etc.)
+		 */
+		ptr = 0x400;
+		for (int y = 0; y < 24; y++) {
+			for (int x = 0; x < 80; x++) {
+				if (y < 8)
+					ptr = 0x400;
+				else if (y >= 8 && y < 16)
+					ptr = 0x428;
+				else
+					ptr = 0x450;
+
+				uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
+
+
+				// printf("%c", c);
+				
+				uint8_t c;
+				if (x % 2 == 0)
+					c = mainRegion->read(offset);
+				else
+				        c = auxRegion->read(offset);
+
+				drawCharacter(x * CHARACTER_WIDTH, y * CHARACTER_HEIGHT, c);
+			}
+
+			//printf("\n");
 		}
 	} else {
 		/* 
@@ -232,8 +265,6 @@ Screen::redrawGraphics(void)
 bool
 Screen::loadFont(std::string filename)
 {
-
-
 	FILE *f = fopen(filename.c_str(), "r");
 	if (! f) {
 		perror("fopen()");
