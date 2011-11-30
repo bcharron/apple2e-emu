@@ -52,6 +52,8 @@ public:
 private:
 	void redrawText(void);
 	void redrawGraphics(void);
+	void redrawGraphicsHires(void);
+	void redrawGraphicsLowres(void);
 	void putZoomPixel(unsigned int x, unsigned int y, Uint32 color);
 	void sdl_putpixel(unsigned int x, unsigned int y, Uint32 color);
 

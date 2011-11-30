@@ -40,6 +40,7 @@ public:
 	bool isBankWrite(void) { return(bankWrite); }
 	bool isSlotCXROM(void) { return(slotCXROM); }
 	bool isSlotC3ROM(void) { return(slotC3ROM); }
+	bool isHires(void) { return(hires); }
 
 	void setKeyboardData(uint8_t val);
 	void doKeyboardStrobe(void);

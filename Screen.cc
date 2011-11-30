@@ -260,6 +260,21 @@ Screen::redrawText(void)
 void
 Screen::redrawGraphics(void)
 {
+	if (switches->isHires()) {
+		redrawGraphicsHires();
+	} else {
+		redrawGraphicsLowres();
+	}
+}
+
+void
+Screen::redrawGraphicsHires(void)
+{
+}
+
+void
+Screen::redrawGraphicsLowres(void)
+{
 }
 
 bool
