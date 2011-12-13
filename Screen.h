@@ -45,6 +45,7 @@ public:
 	bool init(void);
 	void redraw(void);
 	void drawCharacter(int x, int y, int charIndex);
+	void drawBlock(int x, int y, int size_x, int size_y, unsigned char color);
 	bool loadFont(std::string filename);
 	bool setZoom(unsigned int zoomFactor);
 	unsigned int getZoom(void);
@@ -66,6 +67,7 @@ private:
 	MemorySoftSwitch *switches;
 	SDL_Surface *sdl_screen;
 	uint8_t *fontBuffer;
+	Uint32 colors[16];
 };
 
 #endif

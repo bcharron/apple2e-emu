@@ -1,5 +1,5 @@
 /*
- * Screen.cc - <description>
+ * Screen.cc - Part of Apple2-Emu, represents the display
  * Copyright (C) 2011 Benjamin Charron <bcharron@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 
 #include "Screen.h"
 
+#include <assert.h>
 #include <SDL/SDL.h>
 
 /*
@@ -161,6 +162,23 @@ Screen::init(void)
 		return(false);
 	}
 
+	colors[0]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x00); // Black
+	colors[1]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Magenta
+	colors[2]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x55); // Dark blue
+	colors[3]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Purple
+	colors[4]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Dark green
+	colors[5]  = SDL_MapRGB(sdl_screen->format, 0x55, 0x55, 0x55); // Grey 1
+	colors[6]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0xA0); // Medium blue
+	colors[7]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0xFF); // Light blue
+	colors[8]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x00); // Brown
+	colors[9]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x90); // Orange
+	colors[10] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xA0); // Grey 2
+	colors[11] = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Pink
+	colors[12] = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Light green
+	colors[13] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0x00); // Yellow
+	colors[14] = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Aquamarine
+	colors[15] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0xFF); // White
+
 	return(true);
 }
 
@@ -273,8 +291,68 @@ Screen::redrawGraphicsHires(void)
 }
 
 void
+Screen::drawBlock(int x, int y, int size_x, int size_y, unsigned char color)
+{
+	assert(color < 16);
+
+	/* Lock the screen for direct access to the pixels */
+	if ( SDL_MUSTLOCK(sdl_screen) ) {
+		if ( SDL_LockSurface(sdl_screen) < 0 ) {
+			fprintf(stderr, "Can't lock screen: %s\n", SDL_GetError());
+			return;
+		}
+	}
+
+	/* Draw each scanline, one by one */
+	for (int scanline = 0; scanline < size_y; scanline++) {
+		for (uint8_t b = 0; b < size_x; b++) {
+			Uint32 pixel = colors[color];
+			putZoomPixel(x + b, y + scanline, pixel);
+		}
+	}
+
+	/* Lock the screen for direct access to the pixels */
+	if ( SDL_MUSTLOCK(sdl_screen) ) {
+		SDL_UnlockSurface(sdl_screen);
+	}
+}
+
+void
 Screen::redrawGraphicsLowres(void)
 {
+	uint16_t ptr;
+
+	// XXX: Handle mixed-res
+
+	// XXX: Which page is the current one?
+	ptr = 0x400;
+
+	/* 
+	 *  The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450.
+	 *  Each line is 0x80 bytes size (ie: line 0 is at 0x400, line 1 at 0x480, etc.)
+	 */
+	for (int y = 0; y < 48; y++) {
+		for (int x = 0; x < 40; x++) {
+			if (y < 8)
+				ptr = 0x400;
+			else if (y >= 8 && y < 16)
+				ptr = 0x428;
+			else
+				ptr = 0x450;
+			
+			uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
+			uint8_t c = mainRegion->read(offset);
+
+			uint8_t color;
+
+			if (y % 2 == 0)
+				color = c & 0x0F; // Top block
+			else
+				color = (c & 0xF0) >> 4; // Bottom block
+			
+			drawBlock(x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT / 2, color);
+		}
+	}
 }
 
 bool
