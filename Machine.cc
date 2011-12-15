@@ -3555,6 +3555,8 @@ Machine::interactive(void)
 {
 	std::string buf;
 
+	run();
+
 	while(! cin.eof())
 	{		
 		cout << endl;

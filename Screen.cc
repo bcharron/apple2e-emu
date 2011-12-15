@@ -185,11 +185,11 @@ Screen::init(void)
 void
 Screen::redraw(void)
 {
-	if (switches->isMixedMode()) {
+        if (switches->isTextMode()) {
+		redrawText();
+	} else if (switches->isMixedMode()) {
 		redrawGraphics();
 		redrawText();		
-	} else if (switches->isTextMode()) {
-		redrawText();
 	} else {
 		redrawGraphics();
 	}
@@ -235,24 +235,31 @@ Screen::redrawText()
 		 *  The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450.
 		 *  Each line is 0x80 bytes size (ie: line 0 is at 0x400, line 1 at 0x480, etc.)
 		 */
-		// XXX: Which page are we in?
-		ptr = 0x400;
+
+		/* ptr points to the start of the low-res graphics memory */
+		ptr = 0x0400;
+		
+		// But if page2 is enabled, then it start at 0x800
+		if (switches->isPage2())
+			ptr += 0x0400;
 
 		int startPos = 0;
 
-		if (switches->isMixedMode())
+		if (!switches->isTextMode() && switches->isMixedMode())
 			startPos = 20;
+
+		uint16_t adj = 0x0000;
 
 		for (int y = startPos; y < 24; y++) {
 			for (int x = 0; x < 40; x++) {
 				if (y < 8)
-					ptr = 0x400;
+					adj = 0x0000;
 				else if (y >= 8 && y < 16)
-					ptr = 0x428;
+					adj = 0x0028;
 				else
-					ptr = 0x450;
+					adj = 0x0050;
 
-				uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
+				uint16_t offset = ptr + adj + ((y % 8) * CHARACTER_LINE_SIZE) + x;
 				uint8_t c = mainRegion->read(offset);
 
 				drawCharacter(x * CHARACTER_WIDTH, y * CHARACTER_HEIGHT, c);
@@ -311,8 +318,16 @@ Screen::redrawGraphicsLowres(void)
 {
 	uint16_t ptr;
 
-	// XXX: Which page is the current one?
-	ptr = 0x400;
+	/* ptr points to the start of the low-res graphics memory */
+	ptr = 0x0400;
+
+	// But if page2 is enabled, then it start at 0x800
+	if (switches->isPage2())
+		ptr += 0x0400;
+
+	/* Because the screen is interlaced, this is the correction to
+	 * apply to ptr. */
+	uint16_t adj = 0x0000;
 
 	int startLine = 0;
 	int endLine = 24;
@@ -327,11 +342,11 @@ Screen::redrawGraphicsLowres(void)
 	for (int y = startLine; y < endLine; y++) {
 		for (int x = 0; x < 40; x++) {
 			if (y < 8)
-				ptr = 0x400;
+				adj = 0x0000;
 			else if (y >= 8 && y < 16)
-				ptr = 0x428;
+				adj = 0x0028;
 			else
-				ptr = 0x450;
+				adj = 0x0050;
 			
 			uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
 			uint8_t c = mainRegion->read(offset);
