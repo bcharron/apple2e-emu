@@ -28,6 +28,7 @@ class MemorySoftSwitch : public MemoryRegion
 public:
 	MemorySoftSwitch(uint16_t regionStart, uint16_t regionEnd, bool readonly);
 	bool isTextMode(void) { return(text); }
+	bool isMixedMode(void) { return(mixed); }
 	bool isRAMRD(void) { return(ramrd); }
 	bool isRAMWRT(void) { return(ramwrt); }
 	bool useBank2(void) { return(bBank2); }
@@ -48,6 +49,13 @@ public:
 private:
 	void write(uint16_t offset, uint8_t byte);
 	uint8_t read(uint16_t offset);
+
+	void changePage2(bool val) { page2 = val; }
+	void changeText(bool val) { text = val; }
+	void changeHires(bool val) { hires = val; }
+	void changeMixed(bool val) { mixed = val; }
+	void changeAltCharset(bool val) { altCharset = val; }
+	void changeText80Col(bool val) { text80Col = val; }
 
 	bool altCharset;
 	bool text;

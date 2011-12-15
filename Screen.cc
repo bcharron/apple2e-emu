@@ -173,10 +173,10 @@ Screen::init(void)
 	colors[8]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x00); // Brown
 	colors[9]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x90); // Orange
 	colors[10] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xA0); // Grey 2
-	colors[11] = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Pink
+	colors[11] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xA0, 0xFF); // Pink
 	colors[12] = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Light green
 	colors[13] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0x00); // Yellow
-	colors[14] = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Aquamarine
+	colors[14] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xFF); // Aquamarine
 	colors[15] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0xFF); // White
 
 	return(true);
@@ -185,31 +185,25 @@ Screen::init(void)
 void
 Screen::redraw(void)
 {
-	if (switches->isTextMode()) {
+	if (switches->isMixedMode()) {
+		redrawGraphics();
+		redrawText();		
+	} else if (switches->isTextMode()) {
 		redrawText();
 	} else {
 		redrawGraphics();
 	}
+
+	SDL_UpdateRect(sdl_screen, 0, 0, 0, 0);
 }
 
 void
-Screen::redrawText(void)
+Screen::redrawText()
 {
 	uint16_t ptr;
 
 	if (switches->is80Col()) {
 		ptr = 0x400;
-
-                /*
-		for (int y = 0; y < 24; y++) {
-			for (int x = 0; x < 40; x++) {
-				printf("%c", mainRegion->read(ptr + (y * 0x80) + x) & 0x7F);
-				printf("%c", auxRegion->read(ptr + (y * 0x80) + x) & 0x7F);
-			}
-
-			printf("\n");
-		}
-                */
 
 		/* 
 		 *  The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450.
@@ -225,12 +219,9 @@ Screen::redrawText(void)
 				else
 					ptr = 0x450;
 
-				uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
-
-
-				// printf("%c", c);
-				
+				uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;				
 				uint8_t c;
+
 				if (x % 2 == 0)
 					c = mainRegion->read(offset);
 				else
@@ -238,16 +229,21 @@ Screen::redrawText(void)
 
 				drawCharacter(x * CHARACTER_WIDTH, y * CHARACTER_HEIGHT, c);
 			}
-
-			//printf("\n");
 		}
 	} else {
 		/* 
 		 *  The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450.
 		 *  Each line is 0x80 bytes size (ie: line 0 is at 0x400, line 1 at 0x480, etc.)
 		 */
+		// XXX: Which page are we in?
 		ptr = 0x400;
-		for (int y = 0; y < 24; y++) {
+
+		int startPos = 0;
+
+		if (switches->isMixedMode())
+			startPos = 20;
+
+		for (int y = startPos; y < 24; y++) {
 			for (int x = 0; x < 40; x++) {
 				if (y < 8)
 					ptr = 0x400;
@@ -259,20 +255,10 @@ Screen::redrawText(void)
 				uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
 				uint8_t c = mainRegion->read(offset);
 
-				// printf("%c", c);
 				drawCharacter(x * CHARACTER_WIDTH, y * CHARACTER_HEIGHT, c);
 			}
-			//printf("\n");
 		}
 	}
-
-/*
-	for (int x = 0; x < 4096 / 8; x++)
-		drawCharacter(x * 8, ((x * 8) / 480) * 8, x);
-*/
-
-	//drawCharacter(0, 0, 0x61);
-	SDL_UpdateRect(sdl_screen, 0, 0, 0, 0);
 }
 
 void
@@ -290,6 +276,7 @@ Screen::redrawGraphicsHires(void)
 {
 }
 
+/* Draw a block of size_x by size_y at (x,y) */
 void
 Screen::drawBlock(int x, int y, int size_x, int size_y, unsigned char color)
 {
@@ -303,11 +290,13 @@ Screen::drawBlock(int x, int y, int size_x, int size_y, unsigned char color)
 		}
 	}
 
-	/* Draw each scanline, one by one */
-	for (int scanline = 0; scanline < size_y; scanline++) {
-		for (uint8_t b = 0; b < size_x; b++) {
+	// printf("Screen:drawBlock(%dx%d @ %d,%d  color = %d)\n", size_x, size_y, x, y, color); 
+
+	/* Draw a block of size_x by size_y at (x,y) */
+	for (int dy = 0; dy < size_y; dy++) {
+		for (uint8_t dx = 0; dx < size_x; dx++) {
 			Uint32 pixel = colors[color];
-			putZoomPixel(x + b, y + scanline, pixel);
+			putZoomPixel(x + dx, y + dy, pixel);
 		}
 	}
 
@@ -322,16 +311,20 @@ Screen::redrawGraphicsLowres(void)
 {
 	uint16_t ptr;
 
-	// XXX: Handle mixed-res
-
 	// XXX: Which page is the current one?
 	ptr = 0x400;
+
+	int startLine = 0;
+	int endLine = 24;
+
+	if (switches->isMixedMode())
+		endLine = 20;
 
 	/* 
 	 *  The 40-col display is divided in interlaced in 3 parts: 0x400, 0x428, 0x450.
 	 *  Each line is 0x80 bytes size (ie: line 0 is at 0x400, line 1 at 0x480, etc.)
 	 */
-	for (int y = 0; y < 48; y++) {
+	for (int y = startLine; y < endLine; y++) {
 		for (int x = 0; x < 40; x++) {
 			if (y < 8)
 				ptr = 0x400;
@@ -343,14 +336,14 @@ Screen::redrawGraphicsLowres(void)
 			uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
 			uint8_t c = mainRegion->read(offset);
 
-			uint8_t color;
+			uint8_t colorBottomBlock;
+			uint8_t colorTopBlock;
 
-			if (y % 2 == 0)
-				color = c & 0x0F; // Top block
-			else
-				color = (c & 0xF0) >> 4; // Bottom block
+			colorTopBlock = c & 0x0F; // Top block
+			colorBottomBlock = (c & 0xF0) >> 4; // Bottom block
 			
-			drawBlock(x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT / 2, color);
+			drawBlock(x * CHARACTER_WIDTH, y * CHARACTER_WIDTH, CHARACTER_WIDTH, CHARACTER_HEIGHT / 2, colorTopBlock);
+			drawBlock(x * CHARACTER_WIDTH, y * CHARACTER_WIDTH + CHARACTER_HEIGHT/2, CHARACTER_WIDTH, CHARACTER_HEIGHT / 2, colorBottomBlock);
 		}
 	}
 }

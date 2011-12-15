@@ -101,6 +101,30 @@ MemorySoftSwitch::write(uint16_t offset, uint8_t byte)
 			break;
 		}
 
+		case 0xC00C:
+		{
+			changeText80Col(false);
+			break;
+		}
+
+		case 0xC00D:
+		{
+			changeText80Col(true);
+			break;
+		}
+
+		case 0xC00E:
+		{
+			changeAltCharset(false);
+			break;
+		}
+
+		case 0xC00F:
+		{
+			changeAltCharset(true);
+			break;
+		}
+
 		case 0xC010:
 		{
 			// printf("0xC010: Strobe cleared.\n");
@@ -110,73 +134,50 @@ MemorySoftSwitch::write(uint16_t offset, uint8_t byte)
 
 		case 0xC050:
 		{
-			text = false;
+			changeText(false);
 			break;
 		}
 
 		case 0xC051:
 		{
-			text = true;
+			changeText(true);
 			break;
 		}
 
 		case 0xC052:
 		{
-			mixed = false;
+			changeMixed(false);
 			break;
 		}
 
 		case 0xC053:
 		{
-			mixed = true;
+			// XXX: Does setting mixed mode ON change text mode?
+			changeMixed(true);
 			break;
 		}
 
 		case 0xC054:
 		{
-			page2 = false;
+			changePage2(false);
 			break;
 		}
 
 		case 0xC055:
 		{
-			page2 = true;
+			changePage2(true);
 			break;
 		}
 
 		case 0xC056:
 		{
-			hires = false;
+			changeHires(false);
 			break;
 		}
 
 		case 0xC057:
 		{
-			hires = true;
-			break;
-		}
-
-		case 0xC00C:
-		{
-			text80Col = false;
-			break;
-		}
-
-		case 0xC00D:
-		{
-			text80Col = true;
-			break;
-		}
-
-		case 0xC00E:
-		{
-			altCharset = false;
-			break;
-		}
-
-		case 0xC00F:
-		{
-			altCharset = true;
+			changeHires(false);
 			break;
 		}
 
@@ -246,6 +247,18 @@ MemorySoftSwitch::read(uint16_t offset)
 			break;
 		}
 
+		case 0xC01C:
+		{
+			val = (page2 ? 0x80 : 0x00);
+			break;
+		}
+
+		case 0xC01D:
+		{
+			val = (hires ? 0x80 : 0x00);
+			break;
+		}
+
 		case 0xC01E:
 		{
 			val = (altCharset ? 0x80 : 0x00);
@@ -261,6 +274,62 @@ MemorySoftSwitch::read(uint16_t offset)
 		case 0xC030:
 		{
 			// This is the speaker
+			break;
+		}
+
+		case 0xC050:
+		{
+			changeText(false);
+			val = text;
+			break;
+		}
+
+		case 0xC051:
+		{
+			changeText(true);
+			val = text;
+			break;
+		}
+
+		case 0xC052:
+		{
+			changeMixed(false);
+			val = mixed;
+			break;
+		}
+
+		case 0xC053:
+		{
+			changeMixed(true);
+			val = mixed;
+			break;
+		}
+
+		case 0xC054:
+		{
+			changePage2(false);
+			val = page2;
+			break;
+		}
+
+		case 0xC055:
+		{
+			changePage2(true);
+			val = page2;
+			break;
+		}
+
+		case 0xC056:
+		{
+			changeHires(false);
+			val = hires;
+			break;
+		}
+
+		case 0xC057:
+		{
+			changeHires(true);
+			val = hires;
 			break;
 		}
 			

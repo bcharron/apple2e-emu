@@ -51,8 +51,8 @@ public:
 	unsigned int getZoom(void);
 
 private:
-	void redrawText(void);
-	void redrawGraphics(void);
+	void redrawText();
+	void redrawGraphics();
 	void redrawGraphicsHires(void);
 	void redrawGraphicsLowres(void);
 	void putZoomPixel(unsigned int x, unsigned int y, Uint32 color);
