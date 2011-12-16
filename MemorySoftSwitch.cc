@@ -209,6 +209,7 @@ MemorySoftSwitch::read(uint16_t offset)
 		case 0xC000:
 		{
 			// printf("Reading from 0xC000\n");
+			// XXX: Read from a file when "include <file>" is used
 			val = keyboardData;
 
 			if (keyboardStrobe)

@@ -3507,6 +3507,7 @@ enum command_values {
 	CMD_BREAKPOINT,
 	CMD_DISASM,
 	CMD_DUMP,
+	CMD_INCLUDE,
 	CMD_JUMP,
 	CMD_KEY,
 	CMD_QUIT,
@@ -3531,6 +3532,7 @@ struct command_struct COMMAND_TABLE[] =
 	{ "dump",   CMD_DUMP },
 	{ "h",      CMD_HELP },
 	{ "help",   CMD_HELP },
+	{ "include", CMD_INCLUDE },
 	{ "j",      CMD_JUMP },
 	{ "jump",   CMD_JUMP },
 	{ "key",    CMD_KEY  },
@@ -3597,6 +3599,7 @@ Machine::interactive(void)
 				printf("d [$addr]      Disassemble at PC, or $addr if it's given\n");
 				printf("dump $addr     Print hex data at $addr\n");
 				printf("h              This help\n");
+				printf("include $file  Read $file as if it had been typed on screen\n");
 				printf("j $addr        Jump to $addr\n");
 				printf("key $xx        Emulate key $xx being typed-in\n");
 				printf("p $addr        Print data at $addr\n");
@@ -3649,6 +3652,29 @@ Machine::interactive(void)
 					offset += len;
 				}
 
+				break;
+			}
+
+			case CMD_INCLUDE:
+			{
+				std::istringstream istr(arg);
+				std::string filename;
+
+				if (arg.size() > 0) {
+					istr >> filename;
+					ifstream file(filename.c_str(), ios::in);
+					file.close();
+					/*
+					if (file.is_open()) {
+						file.read((char *) data, APPLE2E_ROM_SIZE);
+					*/
+					
+				} else {
+					cout << "Error: Invalid argument '" << arg << "'" << endl;
+					cout << "Usage: include <filename>" << endl;
+				}
+
+				cout << "Including file " << filename << endl;
 				break;
 			}
 

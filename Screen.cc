@@ -166,10 +166,10 @@ Screen::init(void)
 	colors[1]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Magenta
 	colors[2]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x55); // Dark blue
 	colors[3]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Purple
-	colors[4]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Dark green
+	colors[4]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x55, 0x00); // Dark green
 	colors[5]  = SDL_MapRGB(sdl_screen->format, 0x55, 0x55, 0x55); // Grey 1
 	colors[6]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0xA0); // Medium blue
-	colors[7]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0xFF); // Light blue
+	colors[7]  = SDL_MapRGB(sdl_screen->format, 0x55, 0x55, 0xFF); // Light blue
 	colors[8]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x00); // Brown
 	colors[9]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x90); // Orange
 	colors[10] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xA0); // Grey 2
@@ -283,35 +283,6 @@ Screen::redrawGraphicsHires(void)
 {
 }
 
-/* Draw a block of size_x by size_y at (x,y) */
-void
-Screen::drawBlock(int x, int y, int size_x, int size_y, unsigned char color)
-{
-	assert(color < 16);
-
-	/* Lock the screen for direct access to the pixels */
-	if ( SDL_MUSTLOCK(sdl_screen) ) {
-		if ( SDL_LockSurface(sdl_screen) < 0 ) {
-			fprintf(stderr, "Can't lock screen: %s\n", SDL_GetError());
-			return;
-		}
-	}
-
-	// printf("Screen:drawBlock(%dx%d @ %d,%d  color = %d)\n", size_x, size_y, x, y, color); 
-
-	/* Draw a block of size_x by size_y at (x,y) */
-	for (int dy = 0; dy < size_y; dy++) {
-		for (uint8_t dx = 0; dx < size_x; dx++) {
-			Uint32 pixel = colors[color];
-			putZoomPixel(x + dx, y + dy, pixel);
-		}
-	}
-
-	/* Lock the screen for direct access to the pixels */
-	if ( SDL_MUSTLOCK(sdl_screen) ) {
-		SDL_UnlockSurface(sdl_screen);
-	}
-}
 
 void
 Screen::redrawGraphicsLowres(void)
@@ -360,6 +331,36 @@ Screen::redrawGraphicsLowres(void)
 			drawBlock(x * CHARACTER_WIDTH, y * CHARACTER_WIDTH, CHARACTER_WIDTH, CHARACTER_HEIGHT / 2, colorTopBlock);
 			drawBlock(x * CHARACTER_WIDTH, y * CHARACTER_WIDTH + CHARACTER_HEIGHT/2, CHARACTER_WIDTH, CHARACTER_HEIGHT / 2, colorBottomBlock);
 		}
+	}
+}
+
+/* Draw a block of size_x by size_y at (x,y) */
+void
+Screen::drawBlock(int x, int y, int size_x, int size_y, unsigned char color)
+{
+	assert(color < 16);
+
+	/* Lock the screen for direct access to the pixels */
+	if ( SDL_MUSTLOCK(sdl_screen) ) {
+		if ( SDL_LockSurface(sdl_screen) < 0 ) {
+			fprintf(stderr, "Can't lock screen: %s\n", SDL_GetError());
+			return;
+		}
+	}
+
+	// printf("Screen:drawBlock(%dx%d @ %d,%d  color = %d)\n", size_x, size_y, x, y, color); 
+
+	/* Draw a block of size_x by size_y at (x,y) */
+	for (int dy = 0; dy < size_y; dy++) {
+		for (uint8_t dx = 0; dx < size_x; dx++) {
+			Uint32 pixel = colors[color];
+			putZoomPixel(x + dx, y + dy, pixel);
+		}
+	}
+
+	/* Lock the screen for direct access to the pixels */
+	if ( SDL_MUSTLOCK(sdl_screen) ) {
+		SDL_UnlockSurface(sdl_screen);
 	}
 }
 
