@@ -31,6 +31,12 @@
  *  (text/gfx1/gfx2) would be a simple Observer.
  */
 
+/*
+ *  The Apple //e screen's resolution is 40*7 x 24*8 (280x192)
+ *  Regular text mode is 40x24 (one character is 7x8)
+ *  Low-res graphics are 40x48 (one "pixel" is 7x4)
+ *  Hi-res graphics are 280x192 (one "pixel" is 1x1)
+ */
 Screen::Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion, 
 	       MemoryRegion *auxRegion, MemorySoftSwitch *switches)
 	: width(width),
@@ -200,7 +206,7 @@ Screen::redraw(void)
 void
 Screen::redrawText()
 {
-	uint16_t ptr;
+	uint16_t ptr; // Base address of text memory
 
 	if (switches->is80Col()) {
 		ptr = 0x400;
@@ -278,16 +284,136 @@ Screen::redrawGraphics(void)
 	}
 }
 
+// Rather than make a giant if, this table represents the color of a
+// pixel based on 4 factors:
+// Bit 0: Even (1)/Odd column(0)
+// Bit 1: Bit 7 On(1)/Off(0)
+// Bit 2: Adjacent pixels On(1)/Off(0)
+// Bit 3: Pixel is On(1)/Off(0)
+Uint32 HIRES_COLOR_MATRIX[16] = 
+{
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_BLACK,  // 0xxx: Pixel is off
+	COLOR_GREEN,  // 1000: Pixel is on, odd column, bit 7 off, adjacent pixels off
+	COLOR_PURPLE, // 1001: Even column, bit 7 off, adjacent pixels off
+	COLOR_ORANGE, // 1010: Odd column, bit 7 on, adjacent pixels off
+	COLOR_BLUE,   // 1011: Even column, bit 7 on, adjacent pixels off
+	COLOR_WHITE,  // 1100: Odd column, bit 7 off, adjacent pixels on
+	COLOR_WHITE,  // 1101: Even column, bit 7 off, adjacent pixels on
+	COLOR_WHITE,  // 1110: Odd column, bit 7 on, adjacent pixels on
+	COLOR_WHITE,  // 1111: Even column, bit 7 on, adjacent pixels on
+};
+
+/*
+  Two passes:
+  Store black & white pixels in a buffer
+  Redraw screen, using that information  
+*/
+
 void
 Screen::redrawGraphicsHires(void)
 {
+	uint16_t ptr = 0x2000; // Base address of hi-res mem
+	uint16_t adj = 0x0000; // Index on top of base address
+	uint16_t subrow_adj;   // Each row is made of 8 "subrows"
+
+	int endLine = SCREEN_ROWS;
+
+	if (switches->isMixedMode())
+		endLine = 160;
+			// endLine = SCREEN_ROWS - (CHARACTER_HEIGHT * 4); // 160
+
+	// When page 2 is enabled, the memory base is $4000 instead
+	if (switches->isPage2())
+		ptr = 0x4000;
+
+	unsigned char row_buf[280]; // Temporary buffer for the current row
+	
+	printf("endline: %d\n", endLine);
+
+	/* 
+	 *  The hi-res display is interlaced in 3 parts: 0x2000, 0x2028, 0x2050.
+	 *  Each row is 0x80 bytes size (ie: row 0 is at 0x2000, row 1 at 0x2080, etc.)
+	 *  Then after 8 rows, it goes back to 2028. 8 more then back to 2050.
+	 *  For each row, there are 8 lines of pixels is separated by 0x0400
+	 */
+
+	for (int y = 0; y < endLine; y++) {
+		// There are 64 lines between each interlace			
+		adj = 0x28 * (y / 64);
+
+		// There's a 0x400 gap between each subrow
+		subrow_adj = (y % 8) * 0x0400;
+
+		uint16_t offset = ptr + adj + subrow_adj + (y * 40);
+
+		// First fill a buffer
+		for (int x = 0; x < SCREEN_COLS; x++) {
+			uint8_t c = mainRegion->read(offset + x);
+
+			for (int bit = 6; bit <= 0; bit--) {
+				// Extract the bit and keep bit 7
+				unsigned char mask = (0x01 << bit) | 0x80;
+				unsigned char pixel = c & mask;
+
+				row_buf[x] = pixel;
+			}
+		}
+
+		// Using the previously filled buffer, put actual
+		// pixels on the screen with the correct color
+		for (int x = 0; x < SCREEN_COLS; x++) {
+			unsigned char pixel = row_buf[x];
+			unsigned char adjacent = 0x00;
+			unsigned char idx = 0x00;
+			
+			// Get the pixel on the left of this one
+			if (x > 0)
+				adjacent |= row_buf[x - 1];
+
+			// Get the pixel on the right of this one
+			if (x < 279)
+				adjacent |= row_buf[x + 1];
+			
+			// Strip bit 7
+			adjacent &= ~0x80;
+
+			if (adjacent)
+				idx |= HIRES_ADJ_PIXELS_ON;
+
+			bool even = (x % 2 == 0);
+
+			if (even)
+				idx |= HIRES_EVEN_COLUMN;
+
+			if (pixel & 0x80)
+				idx |= HIRES_BIT7_ON;
+
+			if (pixel & ~0x80)
+				idx |= HIRES_PIXEL_ON;
+
+			uint32_t color = colors[HIRES_COLOR_MATRIX[idx]];
+
+			putZoomPixel(x, y, color);
+		}
+	}
 }
 
+void
+Screen::redrawGraphicsDoubleHires(void)
+{
+}
 
 void
 Screen::redrawGraphicsLowres(void)
 {
-	uint16_t ptr;
+	uint16_t ptr; // Base address of lowres memory
 
 	/* ptr points to the start of the low-res graphics memory */
 	ptr = 0x0400;
@@ -387,9 +513,8 @@ Screen::loadFont(std::string filename)
 void
 Screen::drawCharacter(int x, int y, int charIndex)
 {
-	Uint32 white = SDL_MapRGB(sdl_screen->format, 0xff, 0xff, 0xff);
-	// Uint32 white = SDL_MapRGB(sdl_screen->format, 15, 119, 30);
-	Uint32 black = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x00);
+	Uint32 white = colors[COLOR_WHITE];
+	Uint32 black = colors[COLOR_BLACK];
 
 	/* Lock the screen for direct access to the pixels */
 	if ( SDL_MUSTLOCK(sdl_screen) ) {
