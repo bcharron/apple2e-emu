@@ -324,18 +324,20 @@ Screen::redrawGraphicsHires(void)
 	uint16_t subrow_adj;   // Each row is made of 8 "subrows"
 
 	int endLine = SCREEN_ROWS;
+	endLine = 160;
 
+	// XXX: Mixed mode doesn't seem to get set properly with HGR
 	if (switches->isMixedMode())
 		endLine = 160;
 			// endLine = SCREEN_ROWS - (CHARACTER_HEIGHT * 4); // 160
 
 	// When page 2 is enabled, the memory base is $4000 instead
 	if (switches->isPage2())
-		ptr = 0x4000;
+ 		ptr = 0x4000;
 
 	unsigned char row_buf[280]; // Temporary buffer for the current row
 	
-	printf("endline: %d\n", endLine);
+	// printf("endline: %d\n", endLine);
 
 	/* 
 	 *  The hi-res display is interlaced in 3 parts: 0x2000, 0x2028, 0x2050.
@@ -348,21 +350,28 @@ Screen::redrawGraphicsHires(void)
 		// There are 64 lines between each interlace			
 		adj = 0x28 * (y / 64);
 
+		// printf("%d / 64 = %d\n", y, y / 64);
+
 		// There's a 0x400 gap between each subrow
 		subrow_adj = (y % 8) * 0x0400;
 
-		uint16_t offset = ptr + adj + subrow_adj + (y * 40);
+		uint16_t offset = ptr + adj + subrow_adj + (((y/8) % 8) * 0x80);
+
+		// printf("y = %d, adj = $%04X, offset $%04X\n", y, adj, offset);
+
+		unsigned int buf_pos = 0;
 
 		// First fill a buffer
-		for (int x = 0; x < SCREEN_COLS; x++) {
+		for (int x = 0; x < SCREEN_COLS / 7; x++) {
 			uint8_t c = mainRegion->read(offset + x);
 
-			for (int bit = 6; bit <= 0; bit--) {
+			for (int bit = 6; bit >= 0; bit--) {
 				// Extract the bit and keep bit 7
 				unsigned char mask = (0x01 << bit) | 0x80;
 				unsigned char pixel = c & mask;
 
-				row_buf[x] = pixel;
+				// assert(buf_pos < sizeof(row_buf));
+				row_buf[buf_pos++] = pixel;
 			}
 		}
 
@@ -445,6 +454,7 @@ Screen::redrawGraphicsLowres(void)
 			else
 				adj = 0x0050;
 			
+			// XXX: Why isn't adj used here??
 			uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
 			uint8_t c = mainRegion->read(offset);
 
