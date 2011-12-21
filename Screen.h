@@ -41,6 +41,9 @@
 #define CHARACTER_ROWS   24
 #define CHARACTER_LINE_SIZE 0x80
 
+/* Not 100% sure about these colors. The Apple2e ref says this but the
+ * AppleSoft programmer's guide says different. I think this one makes
+ * more sense.. */
 #define COLOR_BLACK  0
 #define COLOR_PURPLE 3
 #define COLOR_BLUE   6

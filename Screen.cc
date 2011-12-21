@@ -177,10 +177,10 @@ Screen::init(void)
 	colors[6]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0xA0); // Medium blue
 	colors[7]  = SDL_MapRGB(sdl_screen->format, 0x55, 0x55, 0xFF); // Light blue
 	colors[8]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x00); // Brown
-	colors[9]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x90); // Orange
+	colors[9]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x55, 0x55); // Orange
 	colors[10] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xA0); // Grey 2
 	colors[11] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xA0, 0xFF); // Pink
-	colors[12] = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Light green
+	colors[12] = SDL_MapRGB(sdl_screen->format, 0x55, 0xFF, 0x55); // Light green
 	colors[13] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0x00); // Yellow
 	colors[14] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xFF); // Aquamarine
 	colors[15] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0xFF); // White
@@ -365,7 +365,7 @@ Screen::redrawGraphicsHires(void)
 		for (int x = 0; x < SCREEN_COLS / 7; x++) {
 			uint8_t c = mainRegion->read(offset + x);
 
-			for (int bit = 6; bit >= 0; bit--) {
+			for (int bit = 0; bit < 7; bit++) {
 				// Extract the bit and keep bit 7
 				unsigned char mask = (0x01 << bit) | 0x80;
 				unsigned char pixel = c & mask;
@@ -455,7 +455,7 @@ Screen::redrawGraphicsLowres(void)
 				adj = 0x0050;
 			
 			// XXX: Why isn't adj used here??
-			uint16_t offset = ptr + ((y % 8) * CHARACTER_LINE_SIZE) + x;
+			uint16_t offset = ptr + adj + ((y % 8) * CHARACTER_LINE_SIZE) + x;
 			uint8_t c = mainRegion->read(offset);
 
 			uint8_t colorBottomBlock;
