@@ -168,6 +168,7 @@ Screen::init(void)
 		return(false);
 	}
 
+	// XXX: A few of these colors are off..
 	colors[0]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x00); // Black
 	colors[1]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Magenta
 	colors[2]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x55); // Dark blue
@@ -324,12 +325,10 @@ Screen::redrawGraphicsHires(void)
 	uint16_t subrow_adj;   // Each row is made of 8 "subrows"
 
 	int endLine = SCREEN_ROWS;
-	endLine = 160;
 
-	// XXX: Mixed mode doesn't seem to get set properly with HGR
+	// In mixed mode, the last 4 lines of the screen remain text
 	if (switches->isMixedMode())
-		endLine = 160;
-			// endLine = SCREEN_ROWS - (CHARACTER_HEIGHT * 4); // 160
+		endLine = SCREEN_ROWS - (CHARACTER_HEIGHT * 4);
 
 	// When page 2 is enabled, the memory base is $4000 instead
 	if (switches->isPage2())
@@ -337,8 +336,6 @@ Screen::redrawGraphicsHires(void)
 
 	unsigned char row_buf[280]; // Temporary buffer for the current row
 	
-	// printf("endline: %d\n", endLine);
-
 	/* 
 	 *  The hi-res display is interlaced in 3 parts: 0x2000, 0x2028, 0x2050.
 	 *  Each row is 0x80 bytes size (ie: row 0 is at 0x2000, row 1 at 0x2080, etc.)

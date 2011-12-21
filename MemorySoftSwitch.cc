@@ -63,9 +63,7 @@ MemorySoftSwitch::setKeyboardData(uint8_t val)
 void
 MemorySoftSwitch::write(uint16_t offset, uint8_t byte)
 {
-	/*
-	printf("Switch: Writing to 0x%X\n", offset);
-	*/
+//	printf("Switch: Writing to 0x%X\n", offset);
 
 	switch(offset)
 	{
@@ -181,7 +179,7 @@ MemorySoftSwitch::write(uint16_t offset, uint8_t byte)
 
 		case 0xC057:
 		{
-			changeHires(false);
+			changeHires(true);
 			break;
 		}
 
@@ -200,10 +198,10 @@ MemorySoftSwitch::read(uint16_t offset)
 {
 	uint8_t val = 0x00;
 
-	/*
+/*
 	if (offset != 0xC000)
 		printf("Switch: Reading from 0x%X\n", offset);
-	*/
+*/
 
 	switch(offset) {
 		case 0xC000:

@@ -838,7 +838,8 @@ Machine::executeNextInstruction(void)
 		case 0x2C:
 		{
 			uint16_t offset = make16(operands[1], operands[0]);
-			do_bit(offset);
+			uint8_t val = memory->read(offset);
+			do_bit(val);
 			break;
 		}
 
