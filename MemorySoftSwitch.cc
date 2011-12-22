@@ -25,6 +25,9 @@
 
 #include <stdio.h>
 
+// Uncomment to enable soft switch access
+// #define DEBUG_SWITCHES
+
 MemorySoftSwitch::MemorySoftSwitch(uint16_t regionStart, uint16_t regionEnd, bool readonly)
 	: MemoryRegion(regionStart, regionEnd, readonly),
 	  altCharset(false),
@@ -63,7 +66,9 @@ MemorySoftSwitch::setKeyboardData(uint8_t val)
 void
 MemorySoftSwitch::write(uint16_t offset, uint8_t byte)
 {
-//	printf("Switch: Writing to 0x%X\n", offset);
+#ifdef DEBUG_SWITCHES
+	printf("Switch: Writing to 0x%X\n", offset);
+#endif
 
 	switch(offset)
 	{
@@ -198,10 +203,10 @@ MemorySoftSwitch::read(uint16_t offset)
 {
 	uint8_t val = 0x00;
 
-/*
+#ifdef DEBUG_SWITCHES
 	if (offset != 0xC000)
 		printf("Switch: Reading from 0x%X\n", offset);
-*/
+#endif
 
 	switch(offset) {
 		case 0xC000:
