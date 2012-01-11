@@ -4,9 +4,11 @@ CC=g++
 
 all: emu
 
-emu: Machine.o MemoryRegion.o MemoryBus.o MemorySoftSwitch.o Screen.o emu.o
+emu: Disk.o Machine.o MemoryRegion.o MemoryBus.o MemorySoftSwitch.o Screen.o emu.o
 
 emu.o: emu.cc
+
+Disk.o: Disk.cc Disk.h
 
 Machine.o: Machine.cc Machine.h
 
