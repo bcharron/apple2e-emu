@@ -22,6 +22,7 @@
  */
 
 #include "MemoryBus.h"
+#include "MemoryDisk.h"
 
 #include <string>
 
@@ -149,6 +150,8 @@ protected:
 	registers_t registers;
 	unsigned long int cycles;
 	Screen *screen;
+	MemoryDisk *diskController;
+	Disk *disk[2];
 	bool pcBreakpointEnabled;
 	uint16_t pcBreakpointOffset;
 

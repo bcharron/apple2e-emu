@@ -70,6 +70,11 @@ MemorySoftSwitch::write(uint16_t offset, uint8_t byte)
 	printf("Switch: Writing to 0x%X\n", offset);
 #endif
 
+#if 0
+	/* Notify every observer about this write */
+	observers.notify(SS_SOFT_SWITCH, offset, byte);
+#endif
+     
 	switch(offset)
 	{
 		case 0xC000:

@@ -9,6 +9,7 @@
 
 #include "Registers.h"
 #include "MemorySoftSwitch.h"
+#include "MemoryDisk.h"
 
 using namespace std;
 
@@ -37,8 +38,9 @@ MemoryBus::init(void)
 	regions[REGION_MAIN_BANK2] = new MemoryRegion(0xD000, 0xDFFF, REGION_RW);
 	regions[REGION_MAIN_RAM] = new MemoryRegion(0x0000, memorySize - 1, REGION_RW);
 	regions[REGION_MAIN_ROM] = new MemoryRegion(0xD000, 0xFFFF, REGION_RO);
+	regions[REGION_SOFT_SWITCHES] = new MemorySoftSwitch(0xC000, 0xC07F, REGION_RW);
+	regions[REGION_SLOT_IO] = new MemoryDisk(0xC090, 0xC09F, REGION_RW);
 	regions[REGION_SLOT_ROMS] = new MemoryRegion(0xC100, 0xCFFF, REGION_RO);
-	regions[REGION_SOFT_SWITCHES] = new MemorySoftSwitch(0xC000, 0xC0FF, REGION_RW);
 }
 
 unsigned int
@@ -126,7 +128,10 @@ MemoryBus::access(uint16_t offset, bool write, uint8_t byte)
 
 		case 0xC0:
 		{
-			region = regions[REGION_SOFT_SWITCHES];
+			if (offset >= 0xC090 && offset <= 0xC09F)
+				region = regions[REGION_SLOT_IO]; // Disk controller
+			else
+				region = regions[REGION_SOFT_SWITCHES];
 			break;
 		}
 

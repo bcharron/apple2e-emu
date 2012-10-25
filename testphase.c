@@ -1,5 +1,5 @@
 /*
- * emu.c - An Apple ][e Emulator
+ * testphase.c - <description>
  * Copyright (C) 2011 Benjamin Charron <bcharron@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -16,47 +16,26 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * emu.c - Benjamin Charron <bcharron@pobox.com>
- * Created  : Fri Sep  9 16:47:51 2011
+ * testphase.c - Benjamin Charron <bcharron@pobox.com>
+ * Created  : Fri Dec 23 09:35:41 2011
  * Revision : $Id$
  */
 
-#include "Machine.h"
-
 #include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h> // strlen
-#include <SDL/SDL.h>
 
-#include <iostream>
-#include <string>
+int main (int argc, char *argv[]) {
+	unsigned char y = 80;
+	unsigned char a;
 
-using namespace std;
+	a = 0;
 
-// The original Apple IIe (AKA Apple ][) is a 6502B ("a high-speed version of 6502")
-// The enhanced Apple IIe (AKA Apple //e) is a 65C02
-void usage(char *argv0)
-{
-	printf("Usage: %s <file.dsk>\n", argv0);
-}
-
-int main (int argc, char *argv[])
-{
-	Machine machine;
-	string romFilename(ROM_FILENAME);
-
-	machine.init();
-
-	if (! machine.loadApple2eROM(romFilename)) {
-		cerr << "Could not load the apple ROM " << ROM_FILENAME << endl;
-		exit(1);
+	for (y = 80; y > 0; y--) {
+		printf("LDA %04X\n", 0xC080 + a);
+		a = y;
+		a = a & 3;
+		a = a << 1;
+		printf("LDA %04X\n", 0xC081 + a);
 	}
-
-	machine.testCPU();
-
-	machine.setPC(BOOTSTRAP_ADDRESS);
-	machine.interactive();
 
 	return (0);
 }

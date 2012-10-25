@@ -43,12 +43,13 @@ public:
 	bool isSlotC3ROM(void) { return(slotC3ROM); }
 	bool isHires(void) { return(hires); }
 
+	void write(uint16_t offset, uint8_t byte);
+	uint8_t read(uint16_t offset);
+
 	void setKeyboardData(uint8_t val);
 	void doKeyboardStrobe(void);
 
 private:
-	void write(uint16_t offset, uint8_t byte);
-	uint8_t read(uint16_t offset);
 
 	void changePage2(bool val) { page2 = val; }
 	void changeText(bool val) { text = val; }

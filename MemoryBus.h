@@ -4,7 +4,7 @@
 #include "MemoryRegion.h"
 #include "Registers.h"
 
-#define NB_REGIONS 8
+#define NB_REGIONS 9
 enum memory_regions {
 	REGION_MAIN_RAM = 0,
 	REGION_MAIN_BANK2,
@@ -14,6 +14,7 @@ enum memory_regions {
 	REGION_AUX_BANK2,
 	REGION_SOFT_SWITCHES,
 	REGION_SLOT_ROMS,
+	REGION_SLOT_IO,
 };
 
 /*

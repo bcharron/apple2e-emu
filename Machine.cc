@@ -10,6 +10,7 @@
 #include <sstream>
 
 #include "instr_table.h"
+#include "MemoryDisk.h"
 
 using namespace std;
 
@@ -120,6 +121,18 @@ Machine::init()
 
 	MemoryRegion *mainRAM = memory->getRegion(REGION_MAIN_RAM);
 	MemoryRegion *auxRAM = memory->getRegion(REGION_AUX_RAM);
+	
+	diskController = (MemoryDisk *) memory->getRegion(REGION_SLOT_IO);
+
+	disk[0] = new Disk();
+	disk[0]->init();
+
+	disk[1] = new Disk();
+	disk[1]->init();
+
+	diskController->setDisk(0, disk[0]);
+	diskController->setDisk(1, disk[1]);
+
 	MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
 
 	screen = new Screen(640, 480, mainRAM, auxRAM, switches);
@@ -136,7 +149,7 @@ Machine::init()
 /*
  * Table 8-1. APPLE2E.ROM file map
 
- FromToDescription
+ From   To     Description
  0x0000 0x01ff Empty
  0x0200 0x02ff Unknown, probably a slot 2 peripheral card rom
  0x0300 0x05ff Empty
@@ -156,8 +169,8 @@ Machine::loadApple2eROM(string &filename)
 
 	if (file.is_open()) {
 		file.read((char *) data, APPLE2E_ROM_SIZE);
-
-		// memory->setRegionData(REGION_SLOT_ROMS, (0xC1FF - 0xC100) + 1, &data[0x0600]);
+		file.close();
+		memory->setRegionData(REGION_SLOT_ROMS, (0xC1FF - 0xC100) + 1, &data[0x0600]); // Disk controller
 		memory->setRegionData(REGION_INTERNAL_ROM, (0xCFFF - 0xC100 + 1), &data[0x4100]);
 		memory->setRegionData(REGION_MAIN_ROM, (0xFFFF - 0xD000 + 1), &data[0x5000]);
 
@@ -3511,6 +3524,7 @@ enum command_values {
 	CMD_INCLUDE,
 	CMD_JUMP,
 	CMD_KEY,
+	CMD_LOAD,
 	CMD_QUIT,
 	CMD_REDRAW,
 	CMD_RET,
@@ -3537,6 +3551,7 @@ struct command_struct COMMAND_TABLE[] =
 	{ "j",      CMD_JUMP },
 	{ "jump",   CMD_JUMP },
 	{ "key",    CMD_KEY  },
+	{ "load",   CMD_LOAD },
 	{ "p",      CMD_DUMP },
 	{ "q",      CMD_QUIT },
 	{ "quit",   CMD_QUIT },
@@ -3558,7 +3573,7 @@ Machine::interactive(void)
 {
 	std::string buf;
 
-	run();
+	// run();
 
 	while(! cin.eof())
 	{		
@@ -3709,6 +3724,21 @@ Machine::interactive(void)
 				} else {
 					cout << "Error: Invalid argument '" << arg << "'" << endl;
 					cout << "Example usage: key 0x61" << endl;
+				}
+				break;
+			}
+
+			case CMD_LOAD:
+			{
+	      			std::istringstream istr(arg);
+				std::string filename;
+
+				if (arg.size() > 0) {
+					istr >> filename;
+					disk[0]->openFile(filename);
+				} else {
+					cout << "Error: Invalid argument '" << arg << "'" << endl;
+					cout << "Example usage: load file.dsk" << endl;
 				}
 				break;
 			}
