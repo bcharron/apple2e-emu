@@ -1,0 +1,69 @@
+Tracks per disk: 35 (0-34)
+Sector per track: 13 or 16
+Bytes per sector: 256
+
+- 35 tracks per disk (0-34, 34 being the innermost)
+- Two phases of the stepper motor are necessary to move to the next track
+- Normally data is on even tracks but some copy protection put data on odd
+  tracks instead
+- There are two track formats: 13 (DOS 3.2.1) and 16 (DOS 3.3) sectors per track
+
+- A track is made of gaps, address fields and data fields.
+
+- Gaps are self-sync bytes to be able to locate the start of the track
+- The self-sync byte is a 0xFF with two trailing '0' bits
+- A bit is written every 4 cycles
+- It takes 5 self-sync bytes to guarantee that the hardware is reading valid data
+- The first gap is typically 128 bytes of self-sync
+- The second gap comes after the address field / before the data field
+- The second gap is typically 5-10 bytes
+- The third gap comes after the data field. Typically 14-24 bytes.
+
+- The address field contains:
+	Prologue (3 bytes: D5 AA 96)
+	Volume (2 bytes, XX YY)
+	Track (2 bytes, XX YY)
+	Sector (2 bytes, XX YY)
+	Checksum (2 bytes, XX YY, xor of the previous 3 bytes)
+	Epilogue (DE AA EB)
+
+Odd-even encoding:
+
+     7   6    5   4    3   2    1   0
+XX: [1] [D7] [1] [D5] [1] [D3] [1] [D1]
+YY: [1] [D6] [1] [D4] [1] [D2] [1] [D0]
+
+- The data field contains:
+	Prologue (3 bytes: D5 AA AD)
+	Data (342 bytes, 6-and-2 encoded)
+	Checksum (1 byte, XX)
+	Epilogue (DE AA EB)
+
+- Motor phase 0-3 are magnets that control the disk head. Activating
+  them in increasing order moves the disk head to a higher
+  track. Activating them in decreasing order moves the head to a lower track.
+
+- With P6ROM (which is an upgrade from a P5ROM disk controller), there
+  are specific rules about bytes that can be read/written to a disk:
+  the most significant bit must be 1 and there can be no more than one
+  pair of consecutive zero bits. This gives 67 possible combinations.
+
+- Because of another restriction (must be a pair of '1' bits) ,
+  on-disk bytes can only have about 2^6 (64) combinations. Since these
+  are not continuous (ie, not 0..63), there is a translation table to
+  convert 0..63 to on-disk format. (ie, 00 = 96).
+
+- D5 and AA are reserved and cannot be used in data (and thus are not
+  in the translation table.)
+
+- A sector's userdata has 256 bytes encoded as 6-and-2, for a total of
+  410 bytes.
+
+- There are two different encoding formats for sector userdata: a
+  5-and-3 (DOS 3.?) or 6-and-2 (DOS 3.3). 6-and-2 means that 6 bits
+  are written in one place and 2 bits in another, then later
+  reassembled.
+
+- There are two steps when reading sector data from disk: translate
+  the 6-bit byte from the translation table and reassemble the 6-and-2
+  bytes.
