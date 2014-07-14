@@ -1,5 +1,5 @@
 /*
- * MemoryDisk.cc - <description>
+ * MemoryDisk.cc - Memory part of the disk controller for the Apple ][e emulator
  * Copyright (C) 2012 Benjamin Charron <bcharron@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -22,6 +22,8 @@
  */
 
 #include "MemoryDisk.h"
+
+#include <cstdio>
 
 #include <assert.h>
 

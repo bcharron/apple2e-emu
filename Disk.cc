@@ -1,5 +1,5 @@
 /*
- * Disk.cc - <description>
+ * Disk.cc - Disk controller for the Apple ][e emulator
  * Copyright (C) 2011 Benjamin Charron <bcharron@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 
 using namespace std;
 
-int8_t XLAT62[64] = {                // Translation table for 6-and-2 encoding
+uint8_t XLAT62[64] = {                // Translation table for 6-and-2 encoding
 	0x96, 0x97, 0x9A, 0x9B, 0x9D, 0x9E, 0x9F, 0xA6, 
 	0xA7, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xB2, 0xB3,
 	0xB4, 0xB5, 0xB6, 0xB7, 0xB9, 0xBA, 0xBB, 0xBC,

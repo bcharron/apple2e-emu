@@ -1,5 +1,5 @@
 /*
- * MemorySoftSwitch.cc - <description>
+ * MemorySoftSwitch.cc - Emulate the Apple ][e's soft switches
  * Copyright (C) 2011 Benjamin Charron <bcharron@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify

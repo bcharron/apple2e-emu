@@ -1,3 +1,26 @@
+/*
+ * Machine.cc - The main machine emulation for the Apple ][e emulator
+ * Copyright (C) 2011 Benjamin Charron <bcharron@pobox.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ * emu.c - Benjamin Charron <bcharron@pobox.com>
+ * Created  : Fri Sep  9 16:47:51 2011
+ * Revision : $Id$
+ */
+
 #include "Machine.h"
 
 #include <assert.h>
@@ -319,8 +342,10 @@ Machine::getSubroutineHandle(uint16_t offset)
 	unsigned int x;
 
 	for (x = 0; x < MONITOR_SUBROUTINES_OFFSET_LEN; x++) {
-		if (monitor_subroutines_offsets[x].offset == offset)
+		if (monitor_subroutines_offsets[x].offset == offset) {
 			name = new std::string(monitor_subroutines_offsets[x].name);
+			break;
+		}
 	}
 
 	return(name);
@@ -3613,15 +3638,20 @@ Machine::interactive(void)
 				printf("Help:\n");
 				printf("b $addr        Breakpoint on $addr\n");
 				printf("d [$addr]      Disassemble at PC, or $addr if it's given\n");
+				printf("disasm [$addr] Disassemble at PC, or $addr if it's given\n");
 				printf("dump $addr     Print hex data at $addr\n");
 				printf("h              This help\n");
 				printf("include $file  Read $file as if it had been typed on screen\n");
+				printf("load $file     Put $file in disk 0\n");
 				printf("j $addr        Jump to $addr\n");
+				printf("jump $addr     Jump to $addr\n");
 				printf("key $xx        Emulate key $xx being typed-in\n");
 				printf("p $addr        Print data at $addr\n");
 				printf("q              Quit\n");
+				printf("r              Run\n");
 				printf("redraw         Redraw the screen\n");
-				printf("ret            Return from JSR\n");
+				printf("ret            Run until return from JSR\n");
+				printf("run            Run\n");
 				printf("sr             Show Registers\n");
 				printf("ss             Show Stack\n");
 				printf("trace          Trace instructions when running\n");
