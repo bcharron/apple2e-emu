@@ -2354,7 +2354,8 @@ Machine::do_adc(uint8_t val)
 
 	if (registers.psw.f.d) {
 		// BCD mode
-		result = from_bcd(registers.a) + from_bcd(val) + registers.psw.f.c;		
+		result = from_bcd(registers.a) + from_bcd(val) + registers.psw.f.c;
+		sResult = (int8_t) from_bcd(registers.a) + (int8_t) from_bcd(val) + registers.psw.f.c;
 		registers.a = to_bcd(result % 100);
 		registers.psw.f.c = (result > 99);
 	} else {
@@ -2395,6 +2396,7 @@ Machine::do_sbc(uint8_t val)
 	if (registers.psw.f.d) {
 		// BCD mode
 		result = from_bcd(registers.a) - from_bcd(val) - (! registers.psw.f.c);
+		sResult = (int8_t) from_bcd(registers.a) - (int8_t) from_bcd(val) - (! registers.psw.f.c);
 		registers.a = to_bcd(result & 0x00FF);
 	} else {
 		// Binary mode.
@@ -3473,8 +3475,6 @@ Machine::run(void)
 	SDL_Event event;
 	bool quit = false;
 
-	SDL_EnableUNICODE(1);
-
 	while(! quit) {
 		if (pcBreakpointEnabled && getPC() == pcBreakpointOffset) {
 			printf("Breakpoint on PC($%04X)\n", pcBreakpointOffset);
@@ -3508,10 +3508,10 @@ Machine::run(void)
 					/* Keyboard event */
 					case SDL_KEYDOWN:
 					{
-						if (event.key.keysym.unicode > 0) {
-							printf("Key event! %c (0x%02X)\n", event.key.keysym.unicode, event.key.keysym.unicode);
+						if (event.key.keysym.sym > 0) {
+							printf("Key event! %c (0x%02X)\n", event.key.keysym.sym, event.key.keysym.sym);
 							MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
-							switches->setKeyboardData(event.key.keysym.unicode & 0x00FF);
+							switches->setKeyboardData(event.key.keysym.sym & 0x00FF);
 							switches->doKeyboardStrobe();
 						}
 						break;

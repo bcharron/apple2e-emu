@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h> // strlen
-#include <SDL/SDL.h>
+#include <SDL.h>
 
 #include <iostream>
 #include <string>

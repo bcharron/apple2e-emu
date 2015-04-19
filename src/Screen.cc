@@ -24,7 +24,7 @@
 #include "Screen.h"
 
 #include <assert.h>
-#include <SDL/SDL.h>
+#include <SDL.h>
 
 /*
  *  XXX: I think the best way to handle switch changes
@@ -42,10 +42,15 @@ Screen::Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion
 	: width(width),
 	  height(height),
 	  zoomFactor(1),
+	  windowWidth(640),	// XXX: Make this configurable.
+	  windowHeight(480),
 	  mainRegion(mainRegion),
 	  auxRegion(auxRegion),
 	  switches(switches),
-	  sdl_screen(NULL)
+	  sdl_window(NULL),
+	  sdl_renderer(NULL),
+	  sdl_texture(NULL),
+	  sdl_surface(NULL)
 {
 }
 
@@ -55,21 +60,13 @@ Screen::Screen(unsigned int width, unsigned int height, MemoryRegion *mainRegion
 bool
 Screen::setZoom(unsigned int zoomFactor)
 {
-	SDL_Surface *newSurface;
-
 	this->zoomFactor = zoomFactor;
 
-	height = CHARACTER_HEIGHT * CHARACTER_ROWS * zoomFactor;
-	width = CHARACTER_WIDTH * CHARACTER_COLS * zoomFactor;
+	this->height = CHARACTER_HEIGHT * CHARACTER_ROWS * zoomFactor;
+	this->width = CHARACTER_WIDTH * CHARACTER_COLS * zoomFactor;
 
-	newSurface = SDL_SetVideoMode(width, height, 8, SDL_SWSURFACE);
-	if ( newSurface == NULL ) {
-		// XXX: Is the old surface still valid though???
-		fprintf(stderr, "Couldn't set %dx%dx8 video mode: %s\n", width, height, SDL_GetError());
-		return(false);
-	}
-
-	sdl_screen = newSurface;
+	// SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	// SDL_RenderSetLogicalSize(sdl_renderer, logicalWidth, logicalHeight);
 
 	return(true);
 }
@@ -88,43 +85,12 @@ Screen::getZoom(void)
 void
 Screen::sdl_putpixel(unsigned int x, unsigned int y, Uint32 pixel)
 {
-	SDL_Surface *surface = sdl_screen;
+    SDL_Surface *surface = sdl_surface;
 
-	int bpp = surface->format->BytesPerPixel;
+    assert(x <= width && y <= height);
+    Uint32 *pixels = (Uint32 *) sdl_surface->pixels;
 
-	if (x >= width || y >= height) {
-		printf("ERROR: Trying to draw past the screen! (%d,%d)\n", x, y);
-		return;
-	}
-
-	/* Here p is the address to the pixel we want to set */
-	Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
-
-	switch(bpp) {
-		case 1:
-			*p = pixel;
-			break;
-
-		case 2:
-			*(Uint16 *)p = pixel;
-			break;
-
-		case 3:
-			if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
-				p[0] = (pixel >> 16) & 0xff;
-				p[1] = (pixel >> 8) & 0xff;
-				p[2] = pixel & 0xff;
-			} else {
-				p[0] = pixel & 0xff;
-				p[1] = (pixel >> 8) & 0xff;
-				p[2] = (pixel >> 16) & 0xff;
-			}
-			break;
-
-		case 4:
-			*(Uint32 *)p = pixel;
-			break;
-	}
+    pixels[(y * surface->w) + x] = pixel;
 }
 
 /*
@@ -140,6 +106,8 @@ Screen::putZoomPixel(unsigned int x, unsigned int y, Uint32 color)
 			sdl_putpixel(x * zoomFactor + zx, y * zoomFactor + zy, color);
 		}
 	}
+
+	// sdl_putpixel(x, y, color);
 }
 
 bool
@@ -152,13 +120,57 @@ Screen::init(void)
 
 	atexit(SDL_Quit);
 
-	sdl_screen = SDL_SetVideoMode(width, height, 8, SDL_SWSURFACE);
-	if ( sdl_screen == NULL ) {
-		fprintf(stderr, "Couldn't set %dx%dx8 video mode: %s\n", width, height, SDL_GetError());
+	sdl_window = SDL_CreateWindow("Apple //e Emulator",
+	                              SDL_WINDOWPOS_CENTERED,
+	                              SDL_WINDOWPOS_CENTERED,
+	                              windowWidth, windowHeight, 0);
+	if ( sdl_window == NULL ) {
+		fprintf(stderr, "Couldn't create %dx%dx8 window: %s\n", windowWidth, windowHeight, SDL_GetError());
 		return(false);
 	}
 
-	SDL_WM_SetCaption("Apple //e Emulator", "icon");
+	sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
+	if ( sdl_renderer == NULL ) {
+		fprintf(stderr, "SDL_CreateRenderer() failed: %s", SDL_GetError());
+		return(false);
+	}
+
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	SDL_RenderSetLogicalSize(sdl_renderer, width, height);
+
+	sdl_texture = SDL_CreateTexture(sdl_renderer,
+	                                SDL_PIXELFORMAT_ARGB8888,
+	                                SDL_TEXTUREACCESS_STREAMING,
+	                                width, height);
+	if ( sdl_texture == NULL ) {
+		fprintf(stderr, "SDL_CreateTexture() failed: %s", SDL_GetError());
+		return(false);
+	}
+
+	/*
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+rmask = 0xff000000;
+gmask = 0x00ff0000;
+bmask = 0x0000ff00;
+amask = 0x000000ff;
+#else
+rmask = 0x000000ff;
+gmask = 0x0000ff00;
+bmask = 0x00ff0000;
+amask = 0xff000000;
+#endif
+	 */
+
+	/* XXX: The height and width should be the one of the current
+	 * resolution, so that SDL/GPU can scale on its own. This implies
+	 * either having two surfaces (one for low and one for hires) or
+	 * re-creating them on the fly.
+	 */
+	sdl_surface = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
+	if ( sdl_surface == NULL ) {
+		fprintf(stderr, "SDL_CreateRGBSurface() failed: %s", SDL_GetError());
+		return(false);
+	}
 
 	fontBuffer = new uint8_t[SCREEN_FONT_SIZE];
 
@@ -169,22 +181,22 @@ Screen::init(void)
 	}
 
 	// XXX: A few of these colors are off..
-	colors[0]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x00); // Black
-	colors[1]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Magenta
-	colors[2]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0x55); // Dark blue
-	colors[3]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x00, 0xFF); // Purple
-	colors[4]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x55, 0x00); // Dark green
-	colors[5]  = SDL_MapRGB(sdl_screen->format, 0x55, 0x55, 0x55); // Grey 1
-	colors[6]  = SDL_MapRGB(sdl_screen->format, 0x00, 0x00, 0xA0); // Medium blue
-	colors[7]  = SDL_MapRGB(sdl_screen->format, 0x55, 0x55, 0xFF); // Light blue
-	colors[8]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x90, 0x00); // Brown
-	colors[9]  = SDL_MapRGB(sdl_screen->format, 0xFF, 0x55, 0x55); // Orange
-	colors[10] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xA0); // Grey 2
-	colors[11] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xA0, 0xFF); // Pink
-	colors[12] = SDL_MapRGB(sdl_screen->format, 0x55, 0xFF, 0x55); // Light green
-	colors[13] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0x00); // Yellow
-	colors[14] = SDL_MapRGB(sdl_screen->format, 0xA0, 0xA0, 0xFF); // Aquamarine
-	colors[15] = SDL_MapRGB(sdl_screen->format, 0xFF, 0xFF, 0xFF); // White
+	colors[0]  = SDL_MapRGB(sdl_surface->format, 0x00, 0x00, 0x00); // Black
+	colors[1]  = SDL_MapRGB(sdl_surface->format, 0xFF, 0x00, 0xFF); // Magenta
+	colors[2]  = SDL_MapRGB(sdl_surface->format, 0x00, 0x00, 0x55); // Dark blue
+	colors[3]  = SDL_MapRGB(sdl_surface->format, 0xFF, 0x00, 0xFF); // Purple
+	colors[4]  = SDL_MapRGB(sdl_surface->format, 0x00, 0x55, 0x00); // Dark green
+	colors[5]  = SDL_MapRGB(sdl_surface->format, 0x55, 0x55, 0x55); // Grey 1
+	colors[6]  = SDL_MapRGB(sdl_surface->format, 0x00, 0x00, 0xA0); // Medium blue
+	colors[7]  = SDL_MapRGB(sdl_surface->format, 0x55, 0x55, 0xFF); // Light blue
+	colors[8]  = SDL_MapRGB(sdl_surface->format, 0xFF, 0x90, 0x00); // Brown
+	colors[9]  = SDL_MapRGB(sdl_surface->format, 0xFF, 0x55, 0x55); // Orange
+	colors[10] = SDL_MapRGB(sdl_surface->format, 0xA0, 0xA0, 0xA0); // Grey 2
+	colors[11] = SDL_MapRGB(sdl_surface->format, 0xFF, 0xA0, 0xFF); // Pink
+	colors[12] = SDL_MapRGB(sdl_surface->format, 0x55, 0xFF, 0x55); // Light green
+	colors[13] = SDL_MapRGB(sdl_surface->format, 0xFF, 0xFF, 0x00); // Yellow
+	colors[14] = SDL_MapRGB(sdl_surface->format, 0xA0, 0xA0, 0xFF); // Aquamarine
+	colors[15] = SDL_MapRGB(sdl_surface->format, 0xFF, 0xFF, 0xFF); // White
 
 	return(true);
 }
@@ -201,7 +213,10 @@ Screen::redraw(void)
 		redrawGraphics();
 	}
 
-	SDL_UpdateRect(sdl_screen, 0, 0, 0, 0);
+	SDL_UpdateTexture(sdl_texture, NULL, sdl_surface->pixels, sdl_surface->pitch);
+	SDL_RenderClear(sdl_renderer);
+	SDL_RenderCopy(sdl_renderer, sdl_texture, NULL, NULL);
+	SDL_RenderPresent(sdl_renderer);
 }
 
 void
@@ -474,8 +489,8 @@ Screen::drawBlock(int x, int y, int size_x, int size_y, unsigned char color)
 	assert(color < 16);
 
 	/* Lock the screen for direct access to the pixels */
-	if ( SDL_MUSTLOCK(sdl_screen) ) {
-		if ( SDL_LockSurface(sdl_screen) < 0 ) {
+	if ( SDL_MUSTLOCK(sdl_surface) ) {
+		if ( SDL_LockSurface(sdl_surface) < 0 ) {
 			fprintf(stderr, "Can't lock screen: %s\n", SDL_GetError());
 			return;
 		}
@@ -492,8 +507,8 @@ Screen::drawBlock(int x, int y, int size_x, int size_y, unsigned char color)
 	}
 
 	/* Lock the screen for direct access to the pixels */
-	if ( SDL_MUSTLOCK(sdl_screen) ) {
-		SDL_UnlockSurface(sdl_screen);
+	if ( SDL_MUSTLOCK(sdl_surface) ) {
+		SDL_UnlockSurface(sdl_surface);
 	}
 }
 
@@ -524,8 +539,8 @@ Screen::drawCharacter(int x, int y, int charIndex)
 	Uint32 black = colors[COLOR_BLACK];
 
 	/* Lock the screen for direct access to the pixels */
-	if ( SDL_MUSTLOCK(sdl_screen) ) {
-		if ( SDL_LockSurface(sdl_screen) < 0 ) {
+	if ( SDL_MUSTLOCK(sdl_surface) ) {
+		if ( SDL_LockSurface(sdl_surface) < 0 ) {
 			fprintf(stderr, "Can't lock screen: %s\n", SDL_GetError());
 			return;
 		}
@@ -548,7 +563,7 @@ Screen::drawCharacter(int x, int y, int charIndex)
 	}
 
 	/* Lock the screen for direct access to the pixels */
-	if ( SDL_MUSTLOCK(sdl_screen) ) {
-		SDL_UnlockSurface(sdl_screen);
+	if ( SDL_MUSTLOCK(sdl_surface) ) {
+		SDL_UnlockSurface(sdl_surface);
 	}
 }

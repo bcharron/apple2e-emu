@@ -1,5 +1,5 @@
-LDFLAGS=`sdl-config --libs` -lSDL
-CPPFLAGS=-Wall -ggdb
+LDFLAGS=`sdl2-config --libs`
+CPPFLAGS=-Wall -ggdb `sdl2-config --cflags`
 CC=g++
 
 all: emu

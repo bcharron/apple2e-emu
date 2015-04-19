@@ -24,7 +24,7 @@
 #ifndef _SCREEN_H
 #define _SCREEN_H
 
-#include <SDL/SDL.h>
+#include <SDL.h>
 
 #include <string>
 
@@ -81,10 +81,16 @@ private:
 	unsigned int height;
 	unsigned int zoomFactor;
 
+	unsigned int windowWidth;
+	unsigned int windowHeight;
+
 	MemoryRegion *mainRegion;
 	MemoryRegion *auxRegion;
 	MemorySoftSwitch *switches;
-	SDL_Surface *sdl_screen;
+	SDL_Window *sdl_window;
+	SDL_Renderer *sdl_renderer;
+	SDL_Texture *sdl_texture;
+	SDL_Surface *sdl_surface;
 	uint8_t *fontBuffer;
 	Uint32 colors[16];
 };

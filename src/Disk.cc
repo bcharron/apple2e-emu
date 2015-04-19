@@ -326,12 +326,11 @@ Disk::readNextByte(void)
 	if (diskImageOpened) {
 		byte = sectorRawData[currentSectorPosition];
 		currentSectorPosition++;
+		printf("0x%02X\n", (unsigned char) byte);
 	} else {
 		printf("Disk image not opened. Returning garbage.\n");
 		byte = 0xff;
 	}
-
-	printf("0x%02X\n", (unsigned char) byte);
 
 	if (currentSectorPosition >= DISK_RAW_SECTOR_LEN) {
 		currentSectorPosition = 0;

@@ -121,7 +121,7 @@ MemoryBus::access(uint16_t offset, bool write, uint8_t byte)
 {
 	MemoryRegion* region = NULL;
 	uint8_t page = get_page(offset);
-	uint8_t result;
+	uint8_t result = 0;
 	MemorySoftSwitch* switches = (MemorySoftSwitch*) regions[REGION_SOFT_SWITCHES];
 
 	switch(page)
