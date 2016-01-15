@@ -3610,6 +3610,7 @@ Machine::interactive(void)
 		getline(cin, buf);
 		if (buf.size() == 0) {
 			executeNextInstruction();
+			dumpRegisters();
 			continue;
 		}
 

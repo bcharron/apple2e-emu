@@ -32,6 +32,8 @@
 
 using namespace std;
 
+void dumpHex(uint8_t *data, uint16_t len);
+
 uint8_t XLAT62[64] = {                // Translation table for 6-and-2 encoding
 	0x96, 0x97, 0x9A, 0x9B, 0x9D, 0x9E, 0x9F, 0xA6, 
 	0xA7, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xB2, 0xB3,
@@ -408,131 +410,104 @@ void encode5And3(uint8_t *in, uint8_t *out)
 	}
 }
 
-/*
- * Prenibble data ($B800-$B829).
- * Convert 256 memory bytes into 342
- * six-bit nibbles as shown below:
- *              RWTSBUF1
- * BB00: 0 0 00-7 00-6 00-5 00-5 00-3 00-2
- * BB01: 0 0 01-7 01-6 01-5 01-4 01-3 01-2
- * BB02: 0 0 02-7 02-6 02-5 02-4 02-3 02-2
- *  .    . .  .    .    .    .    .    .
- *  .    . .  .    .    .    .    .    .
- *  .    . .  .    .    .    .    .    .
- * BBFF: 0 0 FF-7 FF-6 FF-5 FF-4 FF-3 FF-2
- *
- *              RWTSBUF2
- * BC00: 0 0 01-0 01-1 AB-0 AB-1 55-0 55-1
- * BB01: 0 0 00-0 00-1 AA-0 AA-1 54-0 54-1
- * BB02: 0 0 FF-0 FF-1 A9-0 A9-1 53-0 53-1
- *  .    . .  .    .    .    .    .    .
- *  .    . .  .    .    .    .    .    .
- *  .    . .  .    .    .    .    .    .
- * BC54: 0 0 AD-0 AD-1 57-0 57-1 01-0 01-1
- * BC55: 0 0 AC-0 AC-1 56-0 56-1 00-0 00-1
- *
- * Where AC-0 = bit 0 of memory byte which
- *              is offset #$AC bytes into
- *              the data sector.
- * The following bits are duplicated in
- * $BC00 - $BC01 & $BC54 - $BC55 but are
- * ignored in $BC00 - $BC01:
- *        01-0, 01-1, 00-0, 00-1.
+/* Create the low bytes for use in 6-and-2 encoding */
+uint8_t low2(uint8_t in) {
+	uint8_t byte = in & 0x03;
+	uint8_t bit0 = byte & 0x01;
+	uint8_t bit1 = (byte & 0x02) >> 1;
 
- Take a 256 block and encode it 6-and-2 into 342 bytes
- */
-void encode6And2(uint8_t *in, uint8_t *out)
-{
-	int idx = 0;
-
-	for (int x = 0; x < DISK_USERDATA_LEN; x++)
-		out[x] = 0x00;
-
-	for (int x = 0; x <= 0x55; x++) {
-		uint8_t byte = in[idx];
-		out[idx] = byte >> 2;
-
-		// Swap bits 0 and 1
-		uint8_t bit1 = (byte & 0x02) >> 1;
-		uint8_t bit0 = byte & 0x01;
-		uint8_t swap = (bit0 << 1) | bit1;
-		
-		out[DISK_USERDATA_LEN - x] = swap;
-		idx++;
-	}
-
-	for (int x = 0; x <= 0x55; x++) {
-		uint8_t byte = in[idx];
-		out[idx] = byte >> 2;
-
-		// Swap bits 0 and 1
-		uint8_t bit1 = (byte & 0x02) >> 1;
-		uint8_t bit0 = byte & 0x01;
-		uint8_t swap = (bit0 << 1) | bit1;
-
-		uint8_t byte2 = out[DISK_USERDATA_LEN - x];
-		byte2 = (swap << 2) | byte2;
-		out[DISK_USERDATA_LEN - x] = byte2;
-
-		idx++;
-	}
-
-	for (int x = 0; x <= 0x53; x++) {
-		uint8_t byte = in[idx];
-		out[idx] = byte >> 2;
-
-		// Swap bits 0 and 1
-		uint8_t bit1 = (byte & 0x02) >> 1;
-		uint8_t bit0 = byte & 0x01;
-		uint8_t swap = (bit0 << 1) | bit1;
-
-		uint8_t byte2 = out[DISK_USERDATA_LEN - x];
-		byte2 = (swap << 4) | byte2;
-		out[DISK_USERDATA_LEN - x] = byte2;
-
-		idx++;
-	}
-
-	while (idx < 0xff) {
-		uint8_t byte = in[idx];
-		out[idx] = byte >> 2;
-		idx++;
-	}
-	
-	// Last two bit-pairs at 0xFF + 1 and 0xFF + 2
-	{
-		uint8_t byte = in[1];
-
-		// Swap bits 0 and 1
-		uint8_t bit1 = (byte & 0x02) >> 1;
-		uint8_t bit0 = byte & 0x01;
-		uint8_t swap = (bit0 << 1) | bit1;
-
-		uint8_t byte2 = out[256];
-		out[256] = (swap << 4) | byte2;
-
-
-		byte = in[0];
-
-		// Swap bits 0 and 1
-		bit1 = (byte & 0x02) >> 1;
-		bit0 = byte & 0x01;
-		swap = (bit0 << 1) | bit1;
-
-		byte2 = out[257];
-		out[257] = (swap << 4) | byte2;
-	}
+	return(bit0 << 1 | bit1);
 }
 
+/*
+ Take a 256-bytes block and encode it 6-and-2 into 342 bytes. Returns the
+ "checksum". (The last byte, really.)
+*/
+uint8_t encode6And2(uint8_t *in, uint8_t *out)
+{
+	memset(out, 0x00, DISK_USERDATA_LEN);
+
+	// Create the low (2 bits) bytes at buf[0x00..85]
+	// Stop at 0x54 because it would exceed the input buffer.
+	for (int x = 0; x < 0x56; x++) {
+		uint8_t b3 = x < 0x54 ? low2(in[0x56 * 2 + x]) : 0;
+		uint8_t b2 = low2(in[0x56 + x]);
+		uint8_t b1 = low2(in[x]);
+
+		out[x] = b3 << 4 | b2 << 2 | b1;
+
+		assert(out[x] < 64);
+	}
+
+	// Create the high (6 bits) bytes at buf[85..341]
+	for (int src = 0, dst = 0x56; src < 256; src++, dst++) {
+		out[dst] = in[src] >> 2;
+	}
+
+	// Chain-XOR every byte and create the checksum
+	uint8_t tmp = 0;
+	uint8_t last = 0;
+
+	for (int x = 0; x < DISK_USERDATA_LEN; x++) {
+		assert(tmp < 64);
+
+		tmp = out[x] ^ last;
+
+		last = out[x];
+		out[x] = XLAT62[tmp];
+
+		assert(out[x] >= 0x80);
+	}
+
+	// The last byte of the buffer is the checksum. It is XOR'd against
+	// itself during reading/decoding, 0 indicating success.
+
+	return(last);
+}
+
+void
+dumpHex(uint8_t *data, uint16_t len)
+{
+        int x = 0;
+	int offset = 0;
+
+        while(len) {
+                printf("%04X  ", offset);
+
+                for (x = 0; x < 16 && len > 0; x++) {
+                        printf("%02X ", data[offset + x]);
+                        len--;
+                }
+
+                printf("   ");
+
+                for (x = 0; x < 16; x++) {
+                        uint8_t c = data[offset + x];
+                        if (! isprint(c))
+                                c = '.';
+
+                        printf("%c", c);
+
+                }
+
+                printf("\n");
+
+                offset += 16;
+        }
+}
+
+/*
+Prepare a buffer representing a disk sector
+*/
 bool
 Disk::buildSector(uint8_t sectorNumber, uint8_t *out)
 {
 	uint8_t *data = out;
 	uint16_t idx = 0;
 	uint8_t encodeBuffer[2];
-	uint8_t nibblizedSectorData[342];
 
 	// Gap 1
+	// XXX: Shouldn't these sync bytes be 10 bits (0xFF + '0' '0' ?)  Not clear what the hardware hides
 	for (int x = 0; x < DISK_GAP1_LEN; x++)
 		data[idx++] = DISK_SYNC_BYTE;
 
@@ -578,40 +553,17 @@ Disk::buildSector(uint8_t sectorNumber, uint8_t *out)
 	// Encode 6-and-2
 	// Since currentTrack is [0..79], divide by 2 to get the .DSK equivalent of [0..34]
 	unsigned int diskIdx = ((currentTrack/2) * DISK_SECTORS_PER_TRACK + currentSector) * DISK_BYTES_PER_SECTOR;
-	printf("(currentTrack(%d) * DISK_SECTORS_PER_TRACK(%d) + currentSector(%d)) * DISK_BYTES_PER_SECTOR(%d) == %u\n", currentTrack/2, DISK_SECTORS_PER_TRACK, currentSector, DISK_BYTES_PER_SECTOR, diskIdx);
+	// printf("(currentTrack(%d) * DISK_SECTORS_PER_TRACK(%d) + currentSector(%d)) * DISK_BYTES_PER_SECTOR(%d) == %u\n", currentTrack/2, DISK_SECTORS_PER_TRACK, currentSector, DISK_BYTES_PER_SECTOR, diskIdx);
 	uint8_t *currentSectorData = &diskImageData[diskIdx];
-	encode6And2(currentSectorData, nibblizedSectorData);
-
-	checksum = 0;
 	
-	int srcIdx = DISK_USERDATA_LEN - 1;
+	// printf("Decoded data:\n");
+	// dumpHex(currentSectorData, 256);	
 
-	// Writing the sector userdata is done in two steps: the last
-	// 0x56 bytes, then the first 0xFF
+	checksum = encode6And2(currentSectorData, &data[idx]);
 
-	// First, BC55 -> BC00
-	for (int x = 0; x < 86; x++) {
-		uint8_t byte62 = nibblizedSectorData[srcIdx--];
-
-		checksum = checksum ^ byte62;
-
-		assert(byte62 < 64 && checksum < 64);
-
-		// Translate on-the-fly
-		data[idx++] = XLAT62[checksum];
-	}
-
-	// Then, BB00->BBFF
-	for (int x = 0; x < 256; x++) {
-		uint8_t byte62 = nibblizedSectorData[x];
-
-		checksum = checksum ^ byte62;
-
-		assert(byte62 < 64 && checksum < 64);
-
-		// Translate on-the-fly
-		data[idx++] = XLAT62[checksum];
-	}
+	// printf("Encoded data:\n");
+	// dumpHex(&data[idx], DISK_USERDATA_LEN);
+	idx += DISK_USERDATA_LEN;
 
 	// Data Field Checksum
 	data[idx++] = XLAT62[checksum];

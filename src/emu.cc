@@ -53,7 +53,7 @@ int main (int argc, char *argv[])
 		exit(1);
 	}
 
-	machine.testCPU();
+	// machine.testCPU();
 
 	machine.setPC(BOOTSTRAP_ADDRESS);
 	machine.interactive();
