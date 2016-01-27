@@ -3510,8 +3510,9 @@ Machine::run(void)
 					{
 						if (event.key.keysym.sym > 0) {
 							printf("Key event! %c (0x%02X)\n", event.key.keysym.sym, event.key.keysym.sym);
+							uint8_t k = toupper(event.key.keysym.sym & 0xFF);
 							MemorySoftSwitch *switches = (MemorySoftSwitch *) memory->getRegion(REGION_SOFT_SWITCHES);
-							switches->setKeyboardData(event.key.keysym.sym & 0x00FF);
+							switches->setKeyboardData(k);
 							switches->doKeyboardStrobe();
 						}
 						break;
