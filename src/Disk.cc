@@ -34,7 +34,8 @@ using namespace std;
 
 void dumpHex(uint8_t *data, uint16_t len);
 
-uint8_t XLAT62[64] = {                // Translation table for 6-and-2 encoding
+// Translation table for 6-and-2 encoding
+uint8_t XLAT62[64] = {
 	0x96, 0x97, 0x9A, 0x9B, 0x9D, 0x9E, 0x9F, 0xA6, 
 	0xA7, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xB2, 0xB3,
 	0xB4, 0xB5, 0xB6, 0xB7, 0xB9, 0xBA, 0xBB, 0xBC,
@@ -44,10 +45,32 @@ uint8_t XLAT62[64] = {                // Translation table for 6-and-2 encoding
 	0xED, 0xEE, 0xEF, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6,
 	0xF7, 0xF9, 0xFA, 0xFB,	0xFC, 0xFD, 0xFE, 0xFF };
 
+// .DSK are generally in DOS 3.3 order, meaning the sectors are translated as
+// follows.
+unsigned int DOS33_SECTOR_XLAT[16] = {
+	0,	// 0
+	7,	// 1
+	14,	// 2
+	6,	// 3
+	13,	// 4
+	5,	// 5
+	12,	// 6
+	4,	// 7
+	11,	// 8
+	3,	// 9
+	10,	// 10
+	2,	// 11
+	9,	// 12
+	1,	// 13
+	8,	// 14
+	15	// 15
+};
+
 Disk::Disk(void)
 	: diskImageFilename(""),
 	  diskImageData(NULL),
 	  diskImageOpened(false),
+	  currentVolume(0xFE),
 	  currentTrack(0),
 	  currentSector(0),
 	  currentSectorPosition(0),
@@ -97,7 +120,7 @@ Disk::openFile(std::string filename)
 		diskImageOpened = true;
 		cout << "Loaded disk " << diskImageFilename << " OK." << endl;
 
-		printf("Building track %d, sector %d\n", currentTrack, currentSector);
+		printf("Building track %d, sector %d\n", currentTrack / 2, currentSector);
 		buildSector(currentSector, sectorRawData);
 	} else {
 		cerr << "Unable to open " << filename << endl;
@@ -217,7 +240,7 @@ Disk::updateShaftPosition(void)
 	bool ret = false;
 
 	if (shaftPosition != previousShaftPosition) {
-		printf("Shaft position: %d -> %d\n", previousShaftPosition, shaftPosition);
+		// printf("Shaft position: %d -> %d\n", previousShaftPosition, shaftPosition);
 		ret = true;
 	}
 
@@ -263,7 +286,7 @@ Disk::updateHeadTrack(void)
 	bool ret = false;
 
 	if (previousTrack != currentTrack) {
-		printf("Changed track %d -> %d\n", previousTrack, currentTrack);
+		printf("Changed track %d -> %d\n", previousTrack / 2, currentTrack / 2);
 		ret = true;
 	}
 
@@ -288,12 +311,14 @@ Disk::updateHeadTrack(void)
 void
 Disk::phaseOn(uint8_t phaseNumber)
 {
+	// printf("phaseOn(%u)\n", phaseNumber);
 	changePhase(phaseNumber, true);
 }
 
 void
 Disk::phaseOff(uint8_t phaseNumber)
 {
+	// printf("phaseOff(%u)\n", phaseNumber);
 	changePhase(phaseNumber, false);
 }
 
@@ -303,7 +328,7 @@ Disk::changePhase(uint8_t phaseNumber, bool value)
 {
 	assert(phaseNumber < DISK_NB_PHASES);
 
-	printf("phase %d: %d -> %d\n", phaseNumber, phases[phaseNumber], value);
+	// printf("phase %d: %d -> %d\n", phaseNumber, phases[phaseNumber], value);
 	phases[phaseNumber] = value;
 
 	if (updateShaftPosition())
@@ -323,12 +348,12 @@ Disk::readNextByte(void)
 	// Depends on the track and track position. Returns MSB=1 when valid byte is ready to be read.
 	int8_t byte;
 
-	printf("READ[trk:%d sec:%d  pos:%d]: ", currentTrack, currentSector, currentSectorPosition);
+	// printf("READ[trk:%d sec:%d  pos:%d]: ", currentTrack, currentSector, currentSectorPosition);
 
 	if (diskImageOpened) {
 		byte = sectorRawData[currentSectorPosition];
 		currentSectorPosition++;
-		printf("0x%02X\n", (unsigned char) byte);
+		// printf("0x%02X\n", (unsigned char) byte);
 	} else {
 		printf("Disk image not opened. Returning garbage.\n");
 		byte = 0xff;
@@ -339,7 +364,7 @@ Disk::readNextByte(void)
 		currentSector++;
 		currentSector %= DISK_SECTORS_PER_TRACK;
 		
-		printf("Building track %d, sector %d\n", currentTrack, currentSector);
+		printf("Building track %d, sector %d\n", currentTrack / 2, currentSector);
 		buildSector(currentSector, sectorRawData);
 	}
 
@@ -506,6 +531,9 @@ Disk::buildSector(uint8_t sectorNumber, uint8_t *out)
 	uint16_t idx = 0;
 	uint8_t encodeBuffer[2];
 
+	// currentTrack is 0..79, so divide by 2 to get the current track in DOS-parlance
+	uint8_t thisTrack = currentTrack / 2;
+
 	// Gap 1
 	// XXX: Shouldn't these sync bytes be 10 bits (0xFF + '0' '0' ?)  Not clear what the hardware hides
 	for (int x = 0; x < DISK_GAP1_LEN; x++)
@@ -522,7 +550,7 @@ Disk::buildSector(uint8_t sectorNumber, uint8_t *out)
 	data[idx++] = encodeBuffer[BUFF_EVEN];
 
 	// Track
-	oddEvenEncode(currentTrack, encodeBuffer);
+	oddEvenEncode(thisTrack, encodeBuffer);
 	data[idx++] = encodeBuffer[BUFF_ODD];
 	data[idx++] = encodeBuffer[BUFF_EVEN];
 
@@ -532,7 +560,7 @@ Disk::buildSector(uint8_t sectorNumber, uint8_t *out)
 	data[idx++] = encodeBuffer[BUFF_EVEN];
 
 	// Checksum
-	uint8_t checksum = currentVolume ^ currentTrack ^ currentSector;
+	uint8_t checksum = currentVolume ^ thisTrack ^ currentSector;
 	oddEvenEncode(checksum, encodeBuffer);
 	data[idx++] = encodeBuffer[BUFF_ODD];
 	data[idx++] = encodeBuffer[BUFF_EVEN];
@@ -552,8 +580,9 @@ Disk::buildSector(uint8_t sectorNumber, uint8_t *out)
 
 	// Encode 6-and-2
 	// Since currentTrack is [0..79], divide by 2 to get the .DSK equivalent of [0..34]
-	unsigned int diskIdx = ((currentTrack/2) * DISK_SECTORS_PER_TRACK + currentSector) * DISK_BYTES_PER_SECTOR;
-	// printf("(currentTrack(%d) * DISK_SECTORS_PER_TRACK(%d) + currentSector(%d)) * DISK_BYTES_PER_SECTOR(%d) == %u\n", currentTrack/2, DISK_SECTORS_PER_TRACK, currentSector, DISK_BYTES_PER_SECTOR, diskIdx);
+	unsigned int translatedSector = DOS33_SECTOR_XLAT[currentSector];
+	unsigned int diskIdx = (thisTrack * DISK_SECTORS_PER_TRACK + translatedSector) * DISK_BYTES_PER_SECTOR;
+	// printf("(currentTrack(%d) * DISK_SECTORS_PER_TRACK(%d) + currentSector(%d)) * DISK_BYTES_PER_SECTOR(%d) == %u\n", thisTrack, DISK_SECTORS_PER_TRACK, currentSector, DISK_BYTES_PER_SECTOR, diskIdx);
 	uint8_t *currentSectorData = &diskImageData[diskIdx];
 	
 	// printf("Decoded data:\n");

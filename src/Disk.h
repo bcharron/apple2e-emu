@@ -27,7 +27,7 @@
 #ifndef _DISK_H
 #define _DISK_H
 
-#define DISK_MAX_TRACK 80
+#define DISK_MAX_TRACK 79
 #define DISK_TRACKS_PER_DISK 35
 #define DISK_SECTORS_PER_TRACK 16
 #define DISK_BYTES_PER_SECTOR 256
