@@ -90,11 +90,11 @@ MemoryDisk::write(uint16_t offset, uint8_t byte)
 			break;
 
 		case 0x0008:
-			currentDisk->motorOn();
+			currentDisk->motorOff();
 			break;
 
 		case 0x0009:
-			currentDisk->motorOff();
+			currentDisk->motorOn();
 			break;
 
 		case 0x000A:
@@ -174,11 +174,11 @@ MemoryDisk::read(uint16_t offset)
 			break;
 
 		case 0x0008:
-			currentDisk->motorOn();
+			currentDisk->motorOff();
 			break;
 
 		case 0x0009:
-			currentDisk->motorOff();
+			currentDisk->motorOn();
 			break;
 
 		case 0x000A:

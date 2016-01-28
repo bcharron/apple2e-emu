@@ -140,11 +140,13 @@ Disk::closeFile(void)
 void
 Disk::motorOn(void)
 {
+	printf("Disk motor ON\n");
 }
 
 void
 Disk::motorOff(void)
 {
+	printf("Disk motor OFF\n");
 }
 
 void
