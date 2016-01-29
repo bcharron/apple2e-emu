@@ -124,7 +124,8 @@ Machine::Machine()
 	: cycles(0),
 	  pcBreakpointEnabled(false),
 	  pcBreakpointOffset(0x0000),
-	  traceInstructions(false)
+	  traceInstructions(false),
+	  fastForwardDiskOps(true)
 {
 
 }
@@ -205,6 +206,12 @@ Machine::loadApple2eROM(string &filename)
 	delete[] data;
 
 	return(success);
+}
+
+bool
+Machine::loadDisk(int drive, std::string &filename)
+{
+	return(disk[drive]->openFile(filename));
 }
 
 void
@@ -3531,7 +3538,12 @@ Machine::run(void)
 				exit(1);
 			}
 					       
-			nanosleep(&ts, NULL);
+			// Fast-forward when the disk motor is ON
+			if (fastForwardDiskOps && (disk[0]->isMotorEnabled() || disk[1]->isMotorEnabled())) {
+				// Motor is ON, fast-forward through the disk timing routines.
+			} else {
+				nanosleep(&ts, NULL);
+			}
 		}
 	}
 }

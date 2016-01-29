@@ -56,6 +56,12 @@ int main (int argc, char *argv[])
 	// machine.testCPU();
 
 	machine.setPC(BOOTSTRAP_ADDRESS);
+
+	if (argc > 1) {
+		std::string diskFile(argv[1]);
+		machine.loadDisk(0, diskFile);
+	}
+
 	machine.interactive();
 
 	return (0);

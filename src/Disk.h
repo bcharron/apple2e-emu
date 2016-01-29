@@ -64,6 +64,7 @@ public:
 	uint8_t readNextByte(void);
 	void motorOn(void);
 	void motorOff(void);
+	bool isMotorEnabled(void);
 	void writeByte(unsigned char byte);
 	void phaseOn(unsigned char phaseNumber);
 	void phaseOff(unsigned char phaseNumber);
@@ -80,6 +81,7 @@ private:
 	uint8_t *diskImageData;
 	bool diskImageOpened;
 	bool phases[DISK_NB_PHASES];         // Status (on/off) of stepper motor phases (magnets)
+	bool motorEnabled;		     // Whether the disk unit's motor is ON or OFF
 	uint8_t currentVolume;
 	uint8_t currentTrack;                    // Track under the head [0..79]
 	uint8_t currentSector;               // Sector under the head [0..15]

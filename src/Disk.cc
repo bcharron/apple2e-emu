@@ -70,6 +70,7 @@ Disk::Disk(void)
 	: diskImageFilename(""),
 	  diskImageData(NULL),
 	  diskImageOpened(false),
+	  motorEnabled(false),
 	  currentVolume(0xFE),
 	  currentTrack(0),
 	  currentSector(0),
@@ -137,16 +138,24 @@ Disk::closeFile(void)
 	diskImageFilename = "";
 }
 
+bool
+Disk::isMotorEnabled(void)
+{
+	return(motorEnabled);
+}
+
 void
 Disk::motorOn(void)
 {
 	printf("Disk motor ON\n");
+	motorEnabled = true;
 }
 
 void
 Disk::motorOff(void)
 {
 	printf("Disk motor OFF\n");
+	motorEnabled = false;
 }
 
 void

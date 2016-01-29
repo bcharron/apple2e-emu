@@ -42,6 +42,7 @@ public:
 	Machine();
 	bool init(void);
 	bool loadApple2eROM(std::string &filename);
+	bool loadDisk(int drive, std::string &filename);
 	unsigned int dumpInstruction(uint16_t offset);
 	void dumpFlags(spc_flags_t *flags, char *buf);
 	void dumpMemory(uint16_t offset, uint16_t len);
@@ -156,5 +157,6 @@ protected:
 	uint16_t pcBreakpointOffset;
 
 	bool traceInstructions;
+	bool fastForwardDiskOps;
 };
 
