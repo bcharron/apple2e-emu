@@ -50,13 +50,13 @@ class DSKFile:
 
 	def _get_offset(self, track, sector):
 		real_sector = self._dos33_sector_skew(sector)
-		pos = (self.sectors_per_track * self.bytes_per_sector) * track + (real_sector * self.bytes_per_sector)
+		pos = (self.sectors_per_track * track + real_sector) * self.bytes_per_sector
 
 		return(pos)
 
 	# DOS 3.3 leaves the physical sectors in 0..15 order, but "skews" them
 	# in software so that, for example, physical sector 1 corresponds
-	# becomes "soft" sector 7. This is to achieve better performance.
+	# to "soft" sector 7. This is to achieve better performance.
 	# But apparently it doesn't always apply.. I am mystified by this.
 	def _dos33_sector_skew(self, sector):
 		#TABLE = [ 0, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 15 ]
