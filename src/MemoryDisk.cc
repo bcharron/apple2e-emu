@@ -54,7 +54,7 @@ MemoryDisk::write(uint16_t offset, uint8_t byte)
 	if (! currentDisk)
 		return;
 
-	printf("MemoryDisk::read($%04X)\n", offset);
+	printf("MemoryDisk::write($%04X, 0x%02X)\n", offset, byte);
 
 	switch(realOffset) {
 		case 0x0000:
@@ -110,6 +110,7 @@ MemoryDisk::write(uint16_t offset, uint8_t byte)
 			break;
 
 		case 0x000D:
+			// XXX: Writing to disk goes here, I guess.
 			q6 = 1;
 			break;
 

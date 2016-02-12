@@ -464,8 +464,9 @@ uint8_t encode6And2(uint8_t *in, uint8_t *out)
 	memset(out, 0x00, DISK_USERDATA_LEN);
 
 	// Create the low (2 bits) bytes at buf[0x00..85]
-	// Stop at 0x54 because it would exceed the input buffer.
 	for (int x = 0; x < 0x56; x++) {
+		// The last two bytes are special for b3 and the last byte is
+		// special for b1, because 0x56 can't be divided by 3
 		uint8_t b3 = x < 0x54 ? low2(in[0x56 * 2 + x]) : 0;
 		uint8_t b2 = low2(in[0x56 + x]);
 		uint8_t b1 = low2(in[x]);
@@ -534,6 +535,7 @@ dumpHex(uint8_t *data, uint16_t len)
 
 /*
 Prepare a buffer representing a disk sector
+All disk reads will be served from this buffer until it reaches the end of the buffer.
 */
 bool
 Disk::buildSector(uint8_t sectorNumber, uint8_t *out)

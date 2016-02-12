@@ -37,6 +37,14 @@
 
 using namespace std;
 
+const char *RWTS_CMD_CODE[] = {
+	"SEEK",
+	"READ",
+	"WRITE",
+	"ILLEGAL",
+	"FORMAT"
+};
+
 #define SBC_TEST_TABLE_LEN sizeof(SBC_TEST_TABLE)
 uint8_t SBC_TEST_TABLE[] = {
 	0xD8, 0xA9, 0x01, 0x8D, 0x80, 0x03, 0xA9, 0x80,
@@ -3572,6 +3580,7 @@ enum command_values {
 	CMD_STEP,
 	CMD_TRACE,
 	CMD_WRITE,
+	CMD_RWTS,
 	CMD_UNKNOWN
 };
 
@@ -3597,6 +3606,7 @@ struct command_struct COMMAND_TABLE[] =
 	{ "r",      CMD_RUN },
 	{ "ret",    CMD_RET },
 	{ "run",    CMD_RUN },
+	{ "rwts",   CMD_RWTS },
 	{ "sr",     CMD_SHOW_REGS },
 	{ "ss",     CMD_SHOW_STACK },
 	{ "trace",  CMD_TRACE },
@@ -3666,6 +3676,7 @@ Machine::interactive(void)
 				printf("redraw         Redraw the screen\n");
 				printf("ret            Run until return from JSR\n");
 				printf("run            Run\n");
+				printf("rwts           Dump RWTS parameters at ($48)\n");
 				printf("sr             Show Registers\n");
 				printf("ss             Show Stack\n");
 				printf("trace          Trace instructions when running\n");
@@ -3848,6 +3859,69 @@ Machine::interactive(void)
 			case CMD_RUN:
 			{
 				run();
+				break;
+			}
+
+			case CMD_RWTS:
+			{
+				printf("RWTS Parameters:\n");
+				uint8_t low = memory->read(0x48);
+				uint8_t high = memory->read(0x49);
+
+				uint16_t rwts_offset = make16(high, low);
+
+				for (int x = 0; x < 16; x++) {
+					uint8_t b = memory->read(rwts_offset + x);
+
+					switch(x) {
+						case 0x00: printf("Table type: 0x%02X\n", b);
+							   break;
+
+						case 0x01: printf("Slot number (times 16): 0x%02X\n", b);
+							   break;
+
+						case 0x02: printf("Driver number: 0x%02X\n", b);
+							   break;
+
+						case 0x03: printf("Volume number expected (0 = any): 0x%02X\n", b);
+							   break;
+
+						case 0x04: printf("Track number: 0x%02X\n", b);
+							   break;
+
+						case 0x05: printf("Sector number: 0x%02X\n", b);
+							   break;
+
+						case 0x06:
+						{
+							high = memory->read(rwts_offset + x + 1);
+							uint16_t dct_ptr = make16(high, low);
+							printf("Pointer to DCT: %04X\n", dct_ptr);
+							break;
+						}
+
+						case 0x07: break;
+
+						case 0x08:
+						{
+							high = memory->read(rwts_offset + x + 1);
+							uint16_t dct_ptr = make16(high, low);
+							printf("Pointer to user buffer: %04X\n", dct_ptr);
+							break;
+						}
+
+						case 0x09: break;
+
+						case 0x0A: break;
+
+						case 0x0B: printf("Byte count for partial sector (0x00 = 256): %02X\n", b);
+							   break;
+
+						case 0x0C: printf("Command code: %02X (%s)", b, RWTS_CMD_CODE[b]);
+							   break;
+					}
+				}
+
 				break;
 			}
 
